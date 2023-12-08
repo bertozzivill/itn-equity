@@ -44,9 +44,7 @@ ggplot(wealth_quints, aes(x=wealth_quintile, y=proportion)) +
   theme_minimal() +
   theme(legend.position = "none")
 
-# no, but 20% across the dataset appears to be? how can this be?
-table(itn_data$wealth_quintile)
-prop.table(table(itn_data$wealth_quintile))
+
 
 # sort by proportion in quintile
 wealth_quints <- dcast.data.table(wealth_quints, dhs_survey_id~wealth_quintile, value.var="proportion")
@@ -67,49 +65,61 @@ ggplot(wealth_quints, aes(y=wealth_quintile, x=dhs_survey_id, fill=proportion)) 
 
 ## not so beautiful, but fine for now
 
-# according to the DHS docs: chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://dhsprogram.com/pubs/pdf/CR6/CR6.pdf
-# The cut points in the wealth index at which to form the quintiles are
-# calculated by obtaining a weighted frequency distribution of households,
-# the weight being the product of the number of de jure members of the
-# household and the sampling weight of the household.
-# Thus, the distribution represents the national household population,
-# where each member is given the wealth index score of his or her household.
-# The persons are then ordered by the score, and the distribution is
-# divided at the points that form the five 20- percent sections.
-# Then the household score is recoded into the quintile variable so
-# that each member of a household also receives that household’s
-# quintile category. 
+# re-calculate quintile the DHS way, weighting by household sample
+# weight and household size
+itn_data[, hhsize_hh_weight:= hh_sample_wt*hh_size/1000000]
+itn_data[, wealth_quintile_replicated:= cut(x = wealth_index_score, 
+                                            breaks = Hmisc::wtd.quantile(x = wealth_index_score, weights=hhsize_hh_weight,
+                                                                         probs=0:5/5, 
+                                                                         normwt=FALSE),
+                                            labels = FALSE, include.lowest = TRUE),
+         by=dhs_survey_id]
 
-# Let's see if we can recreate this 
-recreate_wealth_quint <- itn_data[, list(dhs_survey_id,
-                                         country_name,
-                                         clusterid,
-                                         hhid,
-                                         hh_sample_wt,
-                                         hh_size,
-                                         wealth_index_score)]
+# also calculate wealth quintile with hh sample weighting only
+itn_data[, wealth_quintile_hh_only:= cut(x = wealth_index_score, 
+                                            breaks = Hmisc::wtd.quantile(x = wealth_index_score, weights=hh_sample_wt,
+                                                                         probs=0:5/5, 
+                                                                         normwt=FALSE),
+                                            labels = FALSE, include.lowest = TRUE),
+         by=dhs_survey_id]
 
-# obtaining a weighted frequency distribution of households,
-# the weight being the product of the number of de jure members of the
-# household and the sampling weight of the household.
-# dividing by 1,000,000 to make hh sampling weights the right value
-recreate_wealth_quint[, updated_weight:=hh_sample_wt*hh_size/1000000]
-
-# try just taking the weighted quantile with this value?
-recreate_wealth_quint[, wealth_quintile_test := cut(x = wealth_index_score, 
-                     breaks = Hmisc::wtd.quantile(x = wealth_index_score, weights=updated_weight,
-                                                  probs=0:5/5, 
-                                                  normwt=FALSE),
-                     labels = FALSE, include.lowest = TRUE), 
-   by = .(dhs_survey_id) ]
-
-# merge this back onto og dataset
-test_wealth_quint <- merge(itn_data, recreate_wealth_quint)
-ggplot(test_wealth_quint, aes(x=wealth_quintile, y=wealth_quintile_recode)) +
-  geom_abline() +
-  geom_point()
-test_wealth_quint[wealth_quintile!=wealth_quintile_test, list(dhs_survey_id,
-                                                              wealth_quintile, wealth_quintile_test, 
-                                                              diff=wealth_quintile-wealth_quintile_test)]
+# how big is the difference between the manual recode and dhs?  
+itn_data[, quintile_discrepancy:= wealth_quintile==wealth_quintile_replicated]
+prop.table(table(itn_data$dhs_survey_id, itn_data$quintile_discrepancy), margin=1)
 
 
+# looks great for everything except the Angola 2011 MIS, which has only a 48% 
+# accuracy rate? 
+prop.table(table(itn_data[dhs_survey_id=="AO2011MIS"]$wealth_quintile_replicated))
+
+# use the manual version for now so it's replicable.
+# how big is the difference between using hh size and not?
+itn_data[, quintile_discrepancy:= wealth_quintile_replicated==wealth_quintile_hh_only]
+prop.table(table(itn_data$dhs_survey_id, itn_data$quintile_discrepancy), margin=1)
+
+
+
+itn_data[,wealth_quintile_hhonly_recode:=factor(wealth_quintile_hh_only, 
+                                                   labels=c("Poorest",
+                                                            "Poorer",
+                                                            "Middle",
+                                                            "Richer",
+                                                            "Richest"))]
+wealth_quints_v2 <- itn_data[!is.na(wealth_quintile_hh_only), list(count=.N, type="no_hhsize_weighting"), by=list(dhs_survey_id,
+                                                    wealth_quintile=wealth_quintile_hhonly_recode)]
+wealth_quints_v2[, proportion:=count/sum(count), by=dhs_survey_id]
+wealth_quints_v2 <- wealth_quints_v2[order(dhs_survey_id, wealth_quintile)]
+wealth_quints_v2[, count:=NULL]
+
+wealth_quints <- rbind(wealth_quints, wealth_quints_v2, fill=T)
+wealth_quints[is.na(type), type:="with_hhsize_weighting"]
+
+
+ggplot(wealth_quints, aes(x=wealth_quintile, y=proportion)) +
+  geom_hline(yintercept = 0.2) +
+  geom_violin(aes(fill=wealth_quintile, color=wealth_quintile), alpha=0.5) +
+  stat_summary(fun.data=mean_sdl, 
+               geom="pointrange")+
+  facet_grid(.~type)+
+  theme_minimal() +
+  theme(legend.position = "none")
