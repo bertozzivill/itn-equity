@@ -9,32 +9,107 @@
 
 library(data.table)
 library(ggplot2)
+library(Hmisc)
+options(digits=2)
 
 rm(list=ls())
 
 # filepaths
-parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/primary_data"
-raw_data_fname <- file.path(parent_dir, "itn_with_housing-0-1-0.csv")
+parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/"
+input_data_fname <- file.path(parent_dir, "primary_data/itn_equity_cleaned.csv")
 
-# load data from Camilo
-data_raw <- fread(raw_data_fname)
+# load data 
+itn_data <- fread(input_data_fname)
 
-# start by isolating only the itn-specific data & doing some data checks
-itn_cols <- names(data_raw)[1:30]
-itn_data_raw <- data_raw[, ..itn_cols]
+# set wealth quint to factor
+itn_data[, wealth_quintile_recode:=factor(wealth_quintile, 
+                                             labels=c("Poorest",
+                                                      "Poorer",
+                                                      "Middle",
+                                                      "Richer",
+                                                      "Richest"))]
 
-# this dataset looks complete, except for some lat-longs... great! 
-summary(itn_data_raw)
+# is 20% of each survey in each wealth quintile?
+wealth_quints <- itn_data[, list(count=.N), by=list(dhs_survey_id,
+                                                    wealth_quintile=wealth_quintile_recode)]
+wealth_quints[, proportion:=count/sum(count), by=dhs_survey_id]
+wealth_quints <- wealth_quints[order(dhs_survey_id, wealth_quintile)]
 
-# try to infer what "itn_theoretical_capacity" is: just n_itn*2, or does it take household size into account?
-itn_data_raw[itn_theoretical_capacity!=(n_itn*2), list(n_defacto_pop, n_itn, itn_theoretical_capacity)]
 
-# ok, is it our old friend pmin(n_defacto_pop, n_itn*2)?
-itn_data_raw[itn_theoretical_capacity!=pmin(n_itn*2, n_defacto_pop),
-             list(n_defacto_pop, n_itn, itn_theoretical_capacity)]
+ggplot(wealth_quints, aes(x=wealth_quintile, y=proportion)) +
+  geom_hline(yintercept = 0.2) +
+  geom_violin(aes(fill=wealth_quintile, color=wealth_quintile), alpha=0.5) +
+  stat_summary(fun.data=mean_sdl, 
+               geom="pointrange")+
+  theme_minimal() +
+  theme(legend.position = "none")
 
-# yes. this is the column the stockflow data calls n_with_access.
+# no, but 20% across the dataset appears to be? how can this be?
+table(itn_data$wealth_quintile)
+prop.table(table(itn_data$wealth_quintile))
 
-# so then we should be able to calculate access via itn_theoretical_capacity/n_defacto_pop.
+# sort by proportion in quintile
+wealth_quints <- dcast.data.table(wealth_quints, dhs_survey_id~wealth_quintile, value.var="proportion")
+wealth_quints <- wealth_quints[order(Poorest, Poorer, Middle, Richer, Richest)]
+wealth_quints[, dhs_survey_id:=reorder(dhs_survey_id, .I)]
+wealth_quints <- melt(wealth_quints, id.vars = "dhs_survey_id", 
+                      variable.name = "wealth_quintile", 
+                      value.name="proportion")
+
+# heatmap across surveys
+# sort by lowest prop in 1st quintile
+# wealth_quints[, dhs_survey_id:=reorder(dhs_survey_id, proportion)]
+ggplot(wealth_quints, aes(y=wealth_quintile, x=dhs_survey_id, fill=proportion)) +
+  geom_tile() +
+  scale_fill_gradient2(midpoint = 0.2) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust = 1))
+
+## not so beautiful, but fine for now
+
+# according to the DHS docs: chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://dhsprogram.com/pubs/pdf/CR6/CR6.pdf
+# The cut points in the wealth index at which to form the quintiles are
+# calculated by obtaining a weighted frequency distribution of households,
+# the weight being the product of the number of de jure members of the
+# household and the sampling weight of the household.
+# Thus, the distribution represents the national household population,
+# where each member is given the wealth index score of his or her household.
+# The persons are then ordered by the score, and the distribution is
+# divided at the points that form the five 20- percent sections.
+# Then the household score is recoded into the quintile variable so
+# that each member of a household also receives that household’s
+# quintile category. 
+
+# Let's see if we can recreate this 
+recreate_wealth_quint <- itn_data[, list(dhs_survey_id,
+                                         country_name,
+                                         clusterid,
+                                         hhid,
+                                         hh_sample_wt,
+                                         hh_size,
+                                         wealth_index_score)]
+
+# obtaining a weighted frequency distribution of households,
+# the weight being the product of the number of de jure members of the
+# household and the sampling weight of the household.
+# dividing by 1,000,000 to make hh sampling weights the right value
+recreate_wealth_quint[, updated_weight:=hh_sample_wt*hh_size/1000000]
+
+# try just taking the weighted quantile with this value?
+recreate_wealth_quint[, wealth_quintile_test := cut(x = wealth_index_score, 
+                     breaks = Hmisc::wtd.quantile(x = wealth_index_score, weights=updated_weight,
+                                                  probs=0:5/5, 
+                                                  normwt=FALSE),
+                     labels = FALSE, include.lowest = TRUE), 
+   by = .(dhs_survey_id) ]
+
+# merge this back onto og dataset
+test_wealth_quint <- merge(itn_data, recreate_wealth_quint)
+ggplot(test_wealth_quint, aes(x=wealth_quintile, y=wealth_quintile_recode)) +
+  geom_abline() +
+  geom_point()
+test_wealth_quint[wealth_quintile!=wealth_quintile_test, list(dhs_survey_id,
+                                                              wealth_quintile, wealth_quintile_test, 
+                                                              diff=wealth_quintile-wealth_quintile_test)]
 
 
