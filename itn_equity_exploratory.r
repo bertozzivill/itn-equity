@@ -36,38 +36,72 @@ wealth_quintile_levels <- c("Poorest",
 # only by hh_sample_weight instead of hh_sample_weight*n_dejure_pop
 itn_data[, hh_sample_wt_times_hh:= hh_sample_wt*n_dejure_pop]
 
+
+# it seems like Hmisc::wtd.quantile() has major bugs https://github.com/harrelfe/Hmisc/issues/97... 
+# try this solution from that github issue
+wtd.quantile<- function (x, weights = NULL, probs = c(0, 0.25, 0.5, 0.75, 1),
+                         type = c("quantile", "(i-1)/(n-1)", "i/(n+1)", "i/n"),
+                         na.rm = TRUE)  {
+  # Function taken from HMISC, but issue solved which is documented here: https://github.com/harrelfe/Hmisc/issues/97#issuecomment-429634634
+  normwt = FALSE
+  if (!length(weights))      return(quantile(x, probs = probs, na.rm = na.rm))
+  type <- match.arg(type)
+  if (any(probs < 0 | probs > 1))      stop("Probabilities must be between 0 and 1 inclusive")
+  nams <- paste(format(round(probs * 100, if (length(probs) >
+                                              1) 2 - log10(diff(range(probs))) else 2)), "%", sep = "")
+  
+  if(na.rm & any(is.na(weights))){   ###### new
+    i<- is.na(weights)
+    x <- x[!i]
+    weights <- weights[!i]
+  }
+  i <- weights <= 0         # nwe: kill negative and zero weights and associated data
+  if (any(i)) {
+    x <- x[!i]
+    weights <- weights[!i]
+  }
+  if (type == "quantile") {
+    if(sum(weights) < 1000000 ) {weights<- weights*1000000/sum(weights)}  ##### new
+    w <- wtd.table(x, weights, na.rm = na.rm, normwt = normwt,
+                   type = "list")
+    x <- w$x
+    wts <- w$sum.of.weights
+    n <- sum(wts)
+    order <- 1 + (n - 1) * probs
+    low <- pmax(floor(order), 1)
+    high <- pmin(low + 1, n)
+    order <- order%%1
+    allq <- approx(cumsum(wts), x, xout = c(low, high), method = "constant",
+                   f = 1, rule = 2)$y
+    k <- length(probs)
+    quantiles <- (1 - order) * allq[1:k] + order * allq[-(1:k)]
+    names(quantiles) <- nams
+    return(quantiles)
+  }
+  w <- wtd.Ecdf(x, weights, na.rm = na.rm, type = type, normwt = normwt)
+  structure(approx(w$ecdf, w$x, xout = probs, rule = 2)$y,
+            names = nams)
+}
+
+
 # todo: write a function for this
 itn_data[, wealth_quintile_by_population:= cut(x = wealth_index_score, 
-                                            breaks = Hmisc::wtd.quantile(x = wealth_index_score, 
+                                            breaks = wtd.quantile(x = wealth_index_score, 
                                                                          weights=hh_sample_wt_times_hh,
-                                                                         probs=0:5/5, 
-                                                                         normwt=FALSE),
+                                                                         probs=0:5/5),
                                             labels = FALSE, include.lowest = TRUE),
          by=dhs_survey_id]
 
 # also calculate wealth quintile with hh sample weighting only
 itn_data[, wealth_quintile_by_household:= cut(x = wealth_index_score, 
-                                         breaks = Hmisc::wtd.quantile(x = wealth_index_score, 
+                                         breaks = wtd.quantile(x = wealth_index_score, 
                                                                       weights=hh_sample_wt,
-                                                                      probs=0:5/5, 
-                                                                      normwt=FALSE),
+                                                                      probs=0:5/5),
                                          labels = FALSE, include.lowest = TRUE),
          by=dhs_survey_id]
 
-# # why are there some nulls in wealth quintile?
-# null_pop_wt <- itn_data[is.na(wealth_quintile_by_population), list(dhs_survey_id, wealth_quintile_dhs, hh_sample_wt_times_hh, n_dejure_pop, wealth_index_score, wealth_quintile_by_population)]
-# pop_breaks <- itn_data[dhs_survey_id %in% null_pop_wt$dhs_survey_id,
-#                        list(by_pop_breaks=Hmisc::wtd.quantile(x = wealth_index_score, 
-#                                                   weights=hh_sample_wt_times_hh,
-#                                                   probs=0:5/5, 
-#                                                   normwt=F)),
-#                        by=dhs_survey_id]
-# 
-# null_surveys <- unique(null_pop_wt$dhs_survey_id)
-# example_null_survey <- null_surveys[1]
-# 
-# pop_breaks[dhs_survey_id==example_null_survey]
-# summary(itn_data[dhs_survey_id==example_null_survey])
+# a single null in wealth quintile, but it should just go to the lowest quintile...
+itn_data[is.na(wealth_quintile_by_household) & dhs_survey_id=="IA2020DHS", wealth_quintile_by_household:=1]
 
 
 ########## Start functions
