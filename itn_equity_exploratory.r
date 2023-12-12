@@ -12,8 +12,9 @@ library(ggplot2)
 library(Hmisc)
 library(survey)
 library(stringr)
+library(wesanderson)
 
-options(digits=3)
+options(digits=4)
 
 rm(list=ls())
 
@@ -23,7 +24,6 @@ input_data_fname <- file.path(parent_dir, "primary_data/itn_equity_cleaned.csv")
 
 # load data 
 itn_data <- fread(input_data_fname)
-setnames(itn_data, "wealth_quintile", "wealth_quintile_dhs")
 
 wealth_quintile_levels <- c("Poorest",
                             "Poorer",
@@ -33,9 +33,9 @@ wealth_quintile_levels <- c("Poorest",
 
 # calculate wealth quintile three different ways: as it comes out of the box,
 # as our way of replicating what comes out of the box, and weighting 
-# only by hh_sample_weight instead of hh_sample_weight*hh_size
-itn_data[, hh_sample_wt:=hh_sample_wt/1000000]
-itn_data[, hh_sample_wt_times_hh:= hh_sample_wt*hh_size]
+# only by hh_sample_weight instead of hh_sample_weight*n_dejure_pop
+itn_data[, hh_sample_wt_times_hh:= hh_sample_wt*n_dejure_pop]
+
 # todo: write a function for this
 itn_data[, wealth_quintile_by_population:= cut(x = wealth_index_score, 
                                             breaks = Hmisc::wtd.quantile(x = wealth_index_score, 
@@ -54,15 +54,23 @@ itn_data[, wealth_quintile_by_household:= cut(x = wealth_index_score,
                                          labels = FALSE, include.lowest = TRUE),
          by=dhs_survey_id]
 
-# todo: why are there some nulls in wealth quintile?
+# # why are there some nulls in wealth quintile?
+# null_pop_wt <- itn_data[is.na(wealth_quintile_by_population), list(dhs_survey_id, wealth_quintile_dhs, hh_sample_wt_times_hh, n_dejure_pop, wealth_index_score, wealth_quintile_by_population)]
+# pop_breaks <- itn_data[dhs_survey_id %in% null_pop_wt$dhs_survey_id,
+#                        list(by_pop_breaks=Hmisc::wtd.quantile(x = wealth_index_score, 
+#                                                   weights=hh_sample_wt_times_hh,
+#                                                   probs=0:5/5, 
+#                                                   normwt=F)),
+#                        by=dhs_survey_id]
+# 
+# null_surveys <- unique(null_pop_wt$dhs_survey_id)
+# example_null_survey <- null_surveys[1]
+# 
+# pop_breaks[dhs_survey_id==example_null_survey]
+# summary(itn_data[dhs_survey_id==example_null_survey])
 
-# convert all wealth quintile vals to factor
-metric_vals <- c("wealth_quintile_dhs", "wealth_quintile_by_population", "wealth_quintile_by_household")
 
-itn_data[,(metric_vals):=lapply(.SD, factor, labels=wealth_quintile_levels),
-         .SDcols=metric_vals]
-
-
+########## Start functions
 
 find_svymean <- function(svy_metric, svy_design){
   mean_dt <- svymean(make.formula(svy_metric), 
@@ -93,7 +101,6 @@ set_up_survey <- function(weights, data, ids){
   return(this_survey_design)
 }
 
-
 summarize_survey <- function(weight_vals, data, ids, metric_vals, by_vals=NULL){
   svy_designs <- lapply(weight_vals, set_up_survey, data=data, ids=ids)
   
@@ -118,73 +125,16 @@ summarize_survey <- function(weight_vals, data, ids, metric_vals, by_vals=NULL){
   return(all_means)
 }
 
+# convert all wealth quintile vals to factor
+metric_vals <- c("wealth_quintile_dhs", "wealth_quintile_by_population", "wealth_quintile_by_household")
+
+itn_data[,(metric_vals):=lapply(.SD, factor, labels=wealth_quintile_levels),
+         .SDcols=metric_vals]
+
 unique_surveys <- unique(itn_data$dhs_survey_id)
 weight_vals <- c("hh_sample_wt", "hh_sample_wt_times_hh")
 
-# Tas' question: what does median household wealth by quintile look like under the different metrics?
-hhsize_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
-  
-  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
-                                  ids = "clusterid",
-                                  weight_vals = weight_vals,
-                                  metric_vals = "hh_size",
-                                  by_vals = c("wealth_quintile_by_population", "wealth_quintile_by_household")
-  )
-  setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
-  these_means[, dhs_survey_id:=this_survey]
-  
-}))
-hhsize_by_quintile <- hhsize_by_quintile[(metric=="wealth_quintile_by_household" & weighting_type=="hh_sample_wt") | 
-                                           (metric!="wealth_quintile_by_household" & weighting_type!="hh_sample_wt")]
-hhsize_by_quintile[, sort_poorest:=hh_size[which(wealth_quintile=="Poorest")], by = .(metric,dhs_survey_id)]
-
-ggplot(hhsize_by_quintile, aes(x=wealth_quintile, y=reorder(dhs_survey_id, hh_size))) +
-  geom_tile(aes(fill=hh_size)) +
-  facet_grid(.~metric) +
-  theme_minimal() +
-  scale_fill_distiller(palette="Spectral")
-
-
-wealth_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
-  
-  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
-                                  ids = "clusterid",
-                                  weight_vals = weight_vals,
-                                  metric_vals = "wealth_index_score",
-                                  by_vals = c("wealth_quintile_by_population", "wealth_quintile_by_household")
-  )
-  setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
-  these_means[, dhs_survey_id:=this_survey]
-  
-}))
-
-# remove inappropriate weighting types 
-wealth_by_quintile <- wealth_by_quintile[(metric=="wealth_quintile_by_household" & weighting_type=="hh_sample_wt") | 
-                                           (metric!="wealth_quintile_by_household" & weighting_type!="hh_sample_wt")]
-
-test_poorest <- wealth_by_quintile[wealth_quintile=="Poorest"]
-test_poorest_wide <- dcast.data.table(test_poorest, dhs_survey_id ~ metric, value.var = "wealth_index_score")
-test_poorest_wide[, diff:= wealth_quintile_by_population-wealth_quintile_by_household]
-test_poorest_wide[, simple_greater:=wealth_quintile_by_household>wealth_quintile_by_population]
-
-ggplot(test_poorest_wide[wealth_quintile_by_population>-5e+05], aes(x=wealth_quintile_by_population, y=wealth_quintile_by_household)) +
-  geom_abline() +
-  geom_point(aes(color=simple_greater)) +
-  theme_minimal() 
-
-
-ggplot(wealth_by_quintile, aes(x=wealth_quintile, y=wealth_index_score)) +
-  geom_violin(aes(fill=wealth_quintile, color=wealth_quintile), alpha=0.5) +
-  stat_summary(fun.data=mean_sdl, 
-               geom="pointrange")+
-  facet_grid(.~metric)+
-  theme_minimal() +
-  theme(legend.position = "none") +
-  labs(x="Wealth Quintile",
-       y="Wealth Index Distribution Across Surveys",
-       title="Comparison Across Data Type and Aggregation Type")
-
-
+##### Check dhs aggregation
 # are 20% of households in each survey in each wealth quintile?
 
 all_wealth_quintiles <- rbindlist(lapply(unique_surveys, function(this_survey){
@@ -201,6 +151,8 @@ all_wealth_quintiles[, wealth_quintile:= factor(gsub(paste(metric_vals, collapse
 all_wealth_quintiles[, rn:=NULL]
 
 # check that means always sum to one
+
+all_wealth_quintiles[, mean:=round(mean, 4)]
 test_sums <- all_wealth_quintiles[, list(tot=sum(mean)), 
               by=.(dhs_survey_id, metric, weighting_type)]
 summary(test_sums)
@@ -220,6 +172,91 @@ ggplot(all_wealth_quintiles, aes(x=wealth_quintile, y=proportion)) +
        y="Proportion Distribution Across Surveys",
        title="Comparison Across Data Type and Aggregation Type")
 
+ggplot(all_wealth_quintiles[weighting_type=="hh_sample_wt_times_hh" & metric=="wealth_quintile_dhs"],
+       aes(x=dhs_survey_id, y=proportion, fill=wealth_quintile)) +
+  geom_bar(stat="identity") +
+  geom_hline(yintercept=c(0.2, 0.4, 0.6, 0.8)) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+unique(all_wealth_quintiles[weighting_type=="hh_sample_wt_times_hh" & metric=="wealth_quintile_dhs" & proportion!=0.2])
+
+
+
+# Tas' question: what does median household wealth by quintile look like under the different metrics?
+print("calculating average de jure pop by quintile")
+hhsize_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
+  
+  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
+                                  ids = "clusterid",
+                                  weight_vals = "hh_sample_wt",
+                                  metric_vals = "n_dejure_pop",
+                                  by_vals = c("wealth_quintile_by_household")
+  )
+  setnames(these_means, "wealth_quintile_by_household", "wealth_quintile")
+  these_means[, dhs_survey_id:=this_survey]
+  
+}))
+
+hhsize_by_quintile[ , quintile_size_rank := order(order(n_dejure_pop, decreasing = FALSE)), by=.(metric,dhs_survey_id) ]
+hhsize_by_quintile[ , quintile_size_factor := factor(quintile_size_rank,
+                                              labels=c("Smallest", "Smaller", "Middle", "Bigger", "Biggest"))]
+
+
+# find a variable that orders from smallest to largest, starting in the "Poorest" category and moving upwards
+find_row_ranking <- dcast.data.table(hhsize_by_quintile, dhs_survey_id ~ wealth_quintile, value.var = "quintile_size_rank") 
+find_row_ranking <- find_row_ranking[order(Poorest, Poorer, Middle, Richer, Richest)]
+find_row_ranking[, row_order:= .I]
+hhsize_by_quintile <- merge(hhsize_by_quintile, find_row_ranking[, list(dhs_survey_id, row_order)])
+
+ggplot(hhsize_by_quintile, aes(x=wealth_quintile, y=reorder(dhs_survey_id, n_dejure_pop))) +
+  geom_tile(aes(fill=n_dejure_pop)) +
+  facet_grid(.~metric) + 
+  theme_minimal() +
+  scale_fill_distiller(palette="Spectral")
+
+ggplot(hhsize_by_quintile, aes(x=wealth_quintile, y=reorder(dhs_survey_id, row_order))) +
+  geom_tile(aes(fill=quintile_size_factor)) +
+  theme_minimal() +
+  scale_fill_brewer(palette="BrBG", name="Household Size Rank") +
+  labs(x="Wealth Quintile",
+       y="Survey")
+
+
+wealth_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
+  
+  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
+                                  ids = "clusterid",
+                                  weight_vals = weight_vals,
+                                  metric_vals = "wealth_index_score",
+                                  by_vals = c("wealth_quintile_by_population", "wealth_quintile_by_household")
+  )
+  setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
+  these_means[, dhs_survey_id:=this_survey]
+  
+}))
+
+# remove inappropriate weighting types 
+wealth_by_quintile <- wealth_by_quintile[(metric=="wealth_quintile_by_household" & weighting_type=="hh_sample_wt") | 
+                                           (metric!="wealth_quintile_by_household" & weighting_type!="hh_sample_wt")]
+
+
+wealth_by_quintile_wide <- dcast.data.table(wealth_by_quintile, dhs_survey_id + wealth_quintile ~ metric, value.var = "wealth_index_score")
+wealth_by_quintile_wide[, diff:= wealth_quintile_by_population-wealth_quintile_by_household]
+wealth_by_quintile_wide[, simple_greater:=wealth_quintile_by_household>wealth_quintile_by_population]
+
+ggplot(wealth_by_quintile_wide, aes(x=wealth_quintile_by_population, y=wealth_quintile_by_household)) +
+  geom_abline() +
+  geom_point(aes(color=simple_greater)) +
+  theme_minimal() +
+  facet_wrap(~wealth_quintile, scales="free") +
+  labs(x="Wealth Index When Weighting by Population",
+       y="Wealth Index When Weighting by Household",
+       title="Wealth Index Comparison")
+
+strange_subset <- unique(wealth_by_quintile_wide[wealth_quintile=="Richest" & wealth_quintile_by_household>(1e+06)]$dhs_survey_id)
+
+all_wealth_quintiles[dhs_survey_id %in% strange_subset[[1]]]
 
 
 
