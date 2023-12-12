@@ -24,6 +24,7 @@ input_data_fname <- file.path(parent_dir, "primary_data/itn_equity_cleaned.csv")
 
 # load data 
 itn_data <- fread(input_data_fname)
+country_survey_map <- unique(itn_data[, list(dhs_survey_id, country_name)])
 
 wealth_quintile_levels <- c("Poorest",
                             "Poorer",
@@ -102,7 +103,7 @@ ggplot(all_wealth_quintiles, aes(x=wealth_quintile, y=proportion)) +
        y="Proportion Distribution Across Surveys",
        title="Comparison Across Data Type and Aggregation Type")
 
-ggplot(all_wealth_quintiles[weighting_type=="hh_sample_wt" & metric=="wealth_quintile_by_household"],
+ggplot(all_wealth_quintiles[weighting_type=="hh_sample_wt_times_hh" & metric=="wealth_quintile_dhs"],
        aes(x=dhs_survey_id, y=proportion, fill=wealth_quintile)) +
   geom_bar(stat="identity") +
   geom_hline(yintercept=c(0.2, 0.4, 0.6, 0.8)) +
@@ -111,6 +112,10 @@ ggplot(all_wealth_quintiles[weighting_type=="hh_sample_wt" & metric=="wealth_qui
   theme(axis.text.x = element_text(angle=45, hjust=1))
 unique(all_wealth_quintiles[weighting_type=="hh_sample_wt_times_hh" & metric=="wealth_quintile_dhs" & proportion!=0.2])
 
+# who isn't being aggregated correctly?
+dhs_only_check <- all_wealth_quintiles[weighting_type=="hh_sample_wt_times_hh" & metric=="wealth_quintile_dhs"]
+dhs_only_check[, proportion:= round(proportion, 2)]
+mismatched_proportions <- unique(dhs_only_check[proportion!=0.2]$dhs_survey_id)
 
 
 # Tas' question: what does median household wealth by quintile look like under the different metrics?
@@ -186,8 +191,35 @@ ggplot(wealth_by_quintile_wide, aes(x=wealth_quintile_by_population, y=wealth_qu
 
 
 # surprising that there's that handful of outliers in each facet... plot wealth index by quintile and survey to check 
+ggplot(wealth_by_quintile[metric=="wealth_quintile_by_household"],
+       aes(x=dhs_survey_id, y=wealth_index_score, fill=wealth_quintile)) +
+  geom_bar(stat="identity", position = "dodge") +
+  facet_grid(metric~.) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
 
+wealth_by_quintile <- merge(wealth_by_quintile, country_survey_map, all.x = T)
+wealth_by_quintile[, survey_count:= seq_len(.N), by=.(metric, wealth_quintile, country_name)]
 
+surprising_surveys <- wealth_by_quintile_wide[wealth_quintile=="Richest" & wealth_quintile_by_household > 1e+06 ]$dhs_survey_id
+surprising_countries <- country_survey_map[dhs_survey_id %in% surprising_surveys]$country_name
+
+explore_surprising <- wealth_by_quintile[metric=="wealth_quintile_by_household" & country_name %in% surprising_countries]
+# I suspect that the issue might be an extra trailing zero at the end of the wealth index score?
+explore_surprising_full <- itn_data[dhs_survey_id %in% surprising_surveys]
+explore_surprising_full[, final_digit:= wealth_index_score %% 10]
+unique(explore_surprising_full$final_digit)
+# it's zero everywhere except IA2020DHS, where every digit ends in one?? 
+
+ggplot(explore_surprising,
+       aes(x=wealth_quintile, y=wealth_index_score, fill=wealth_quintile)) +
+  geom_bar(stat="identity", position = "dodge") +
+  geom_text(data=explore_surprising[wealth_quintile=="Middle"], y=1.5e+06, aes(label=dhs_survey_id)) + 
+  facet_grid(country_name ~ survey_count) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Wealth Index Score")
 
 
 
