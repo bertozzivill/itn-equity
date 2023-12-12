@@ -36,55 +36,6 @@ wealth_quintile_levels <- c("Poorest",
 # only by hh_sample_weight instead of hh_sample_weight*n_dejure_pop
 itn_data[, hh_sample_wt_times_hh:= hh_sample_wt*n_dejure_pop]
 
-
-# it seems like Hmisc::wtd.quantile() has major bugs https://github.com/harrelfe/Hmisc/issues/97... 
-# try this solution from that github issue
-wtd.quantile<- function (x, weights = NULL, probs = c(0, 0.25, 0.5, 0.75, 1),
-                         type = c("quantile", "(i-1)/(n-1)", "i/(n+1)", "i/n"),
-                         na.rm = TRUE)  {
-  # Function taken from HMISC, but issue solved which is documented here: https://github.com/harrelfe/Hmisc/issues/97#issuecomment-429634634
-  normwt = FALSE
-  if (!length(weights))      return(quantile(x, probs = probs, na.rm = na.rm))
-  type <- match.arg(type)
-  if (any(probs < 0 | probs > 1))      stop("Probabilities must be between 0 and 1 inclusive")
-  nams <- paste(format(round(probs * 100, if (length(probs) >
-                                              1) 2 - log10(diff(range(probs))) else 2)), "%", sep = "")
-  
-  if(na.rm & any(is.na(weights))){   ###### new
-    i<- is.na(weights)
-    x <- x[!i]
-    weights <- weights[!i]
-  }
-  i <- weights <= 0         # nwe: kill negative and zero weights and associated data
-  if (any(i)) {
-    x <- x[!i]
-    weights <- weights[!i]
-  }
-  if (type == "quantile") {
-    if(sum(weights) < 1000000 ) {weights<- weights*1000000/sum(weights)}  ##### new
-    w <- wtd.table(x, weights, na.rm = na.rm, normwt = normwt,
-                   type = "list")
-    x <- w$x
-    wts <- w$sum.of.weights
-    n <- sum(wts)
-    order <- 1 + (n - 1) * probs
-    low <- pmax(floor(order), 1)
-    high <- pmin(low + 1, n)
-    order <- order%%1
-    allq <- approx(cumsum(wts), x, xout = c(low, high), method = "constant",
-                   f = 1, rule = 2)$y
-    k <- length(probs)
-    quantiles <- (1 - order) * allq[1:k] + order * allq[-(1:k)]
-    names(quantiles) <- nams
-    return(quantiles)
-  }
-  w <- wtd.Ecdf(x, weights, na.rm = na.rm, type = type, normwt = normwt)
-  structure(approx(w$ecdf, w$x, xout = probs, rule = 2)$y,
-            names = nams)
-}
-
-
-# todo: write a function for this
 itn_data[, wealth_quintile_by_population:= cut(x = wealth_index_score, 
                                             breaks = wtd.quantile(x = wealth_index_score, 
                                                                          weights=hh_sample_wt_times_hh,
@@ -103,61 +54,6 @@ itn_data[, wealth_quintile_by_household:= cut(x = wealth_index_score,
 # a single null in wealth quintile, but it should just go to the lowest quintile...
 itn_data[is.na(wealth_quintile_by_household) & dhs_survey_id=="IA2020DHS", wealth_quintile_by_household:=1]
 
-
-########## Start functions
-
-find_svymean <- function(svy_metric, svy_design){
-  mean_dt <- svymean(make.formula(svy_metric), 
-                      svy_design, na.rm=T)
-  mean_dt <- as.data.table(mean_dt, keep.rownames=T)
-  mean_dt[, weighting_type:=svy_design$weights_name]
-  mean_dt[, metric:=svy_metric]
-  return(mean_dt)
-}
-
-find_svyby <- function(svy_by, svy_metric, svy_design){
-  mean_dt <- svyby(make.formula(svy_metric),
-                   by = make.formula(svy_by),
-                   design = svy_design, svymean,
-                   na.rm=T)
-  mean_dt <- as.data.table(mean_dt)
-  mean_dt[, weighting_type:=svy_design$weights_name]
-  
-  mean_dt[, metric:=svy_by]
-  return(mean_dt)
-}
-
-set_up_survey <- function(weights, data, ids){
-  this_survey_design <- svydesign(data=data,
-                                  ids= as.formula(paste("~", ids)), 
-                                  weights= as.formula(paste("~", weights)))
-  this_survey_design$weights_name <- weights
-  return(this_survey_design)
-}
-
-summarize_survey <- function(weight_vals, data, ids, metric_vals, by_vals=NULL){
-  svy_designs <- lapply(weight_vals, set_up_survey, data=data, ids=ids)
-  
-  if (length(by_vals)==0){
-    all_means <- rbindlist(lapply(svy_designs, 
-                                  function(this_survey_design){
-                                    rbindlist(lapply(metric_vals,
-                                                     find_svymean,
-                                                     svy_design=this_survey_design))
-                                  }))
-  }else{
-    all_means <- rbindlist(lapply(svy_designs, 
-                                  function(this_survey_design){
-                                    rbindlist(lapply(by_vals,
-                                                     find_svyby,
-                                                     svy_metric=metric_vals,
-                                                     svy_design=this_survey_design),
-                                              use.names=F)
-                                  }))
-  }
-  
-  return(all_means)
-}
 
 # convert all wealth quintile vals to factor
 metric_vals <- c("wealth_quintile_dhs", "wealth_quintile_by_population", "wealth_quintile_by_household")
@@ -206,7 +102,7 @@ ggplot(all_wealth_quintiles, aes(x=wealth_quintile, y=proportion)) +
        y="Proportion Distribution Across Surveys",
        title="Comparison Across Data Type and Aggregation Type")
 
-ggplot(all_wealth_quintiles[weighting_type=="hh_sample_wt_times_hh" & metric=="wealth_quintile_dhs"],
+ggplot(all_wealth_quintiles[weighting_type=="hh_sample_wt" & metric=="wealth_quintile_by_household"],
        aes(x=dhs_survey_id, y=proportion, fill=wealth_quintile)) +
   geom_bar(stat="identity") +
   geom_hline(yintercept=c(0.2, 0.4, 0.6, 0.8)) +
@@ -283,16 +179,13 @@ ggplot(wealth_by_quintile_wide, aes(x=wealth_quintile_by_population, y=wealth_qu
   geom_abline() +
   geom_point(aes(color=simple_greater)) +
   theme_minimal() +
-  facet_wrap(~wealth_quintile, scales="free") +
+  facet_wrap(~wealth_quintile) +
   labs(x="Wealth Index When Weighting by Population",
        y="Wealth Index When Weighting by Household",
        title="Wealth Index Comparison")
 
-strange_subset <- unique(wealth_by_quintile_wide[wealth_quintile=="Richest" & wealth_quintile_by_household>(1e+06)]$dhs_survey_id)
 
-all_wealth_quintiles[dhs_survey_id %in% strange_subset[[1]]]
-
-
+# surprising that there's that handful of outliers in each facet... plot wealth index by quintile and survey to check 
 
 
 
