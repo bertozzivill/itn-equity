@@ -77,5 +77,3 @@ write.csv(itn_data, file=file.path(parent_dir, "itn_equity_cleaned.csv"), row.na
 
 
 
-
-

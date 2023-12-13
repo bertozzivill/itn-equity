@@ -38,8 +38,11 @@ extra_digit_surveys <- c("AO2011MIS",
                          "SN2016DHS",
                          "ZW2015DHS")
 
-itn_data[dhs_survey_id %in% extra_digit_surveys, 
-         wealth_index_score:= as.integer(wealth_index_score/10)]
+# itn_data[dhs_survey_id %in% extra_digit_surveys,
+#          wealth_index_score:= as.integer(wealth_index_score/10)]
+# 
+
+
 
 # calculate wealth quintile three different ways: as it comes out of the box,
 # as our way of replicating what comes out of the box, and weighting 
@@ -215,6 +218,85 @@ ggplot(wealth_by_quintile[metric=="wealth_quintile_by_household"],
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
 
+wealth_by_quintile <- merge(wealth_by_quintile, country_survey_map, all.x = T)
+wealth_by_quintile[, survey_count:= seq_len(.N), by=.(metric, wealth_quintile, country_name)]
+surprising_surveys <- wealth_by_quintile_wide[wealth_quintile=="Richest" & wealth_quintile_by_household > 1e+06 ]$dhs_survey_id
+surprising_countries <- country_survey_map[dhs_survey_id %in% surprising_surveys]$country_name
+
+explore_surprising <- wealth_by_quintile[metric=="wealth_quintile_by_household" & country_name %in% surprising_countries]
+# I suspect that the issue might be an extra trailing zero at the end of the wealth index score?
+explore_surprising_full <- itn_data[dhs_survey_id %in% surprising_surveys]
+explore_surprising_full[, final_digit:= wealth_index_score %% 10]
+unique(explore_surprising_full$final_digit)
+# it's zero everywhere except IA2020DHS, where every digit ends in one?? 
+
+ggplot(explore_surprising,
+       aes(x=wealth_quintile, y=wealth_index_score, fill=wealth_quintile)) +
+  geom_bar(stat="identity", position = "dodge") +
+  geom_text(data=explore_surprising[wealth_quintile=="Middle"], y=1.5e+06, aes(label=dhs_survey_id)) + 
+  facet_grid(country_name ~ survey_count) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Wealth Index Score")
+
+
+##### What does ITN Access by wealth quintile look like?
+access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
+  
+  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
+                                  ids = "clusterid",
+                                  weight_vals = weight_vals,
+                                  metric_vals = "access",
+                                  by_vals = c("wealth_quintile_by_population", "wealth_quintile_by_household")
+  )
+  setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
+  these_means[, dhs_survey_id:=this_survey]
+  
+}))
+
+# remove inappropriate weighting types 
+access_by_quintile <- access_by_quintile[(metric=="wealth_quintile_by_household" & weighting_type=="hh_sample_wt") | 
+                                           (metric!="wealth_quintile_by_household" & weighting_type!="hh_sample_wt")]
+
+access_by_quintile <-merge(access_by_quintile, country_survey_map, all.x=T)
+access_by_quintile[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id))]
+access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
+
+ggplot(access_by_quintile_hh[country_name=="Tanzania"],
+       aes(x=dhs_survey_id, y=access, fill=wealth_quintile)) +
+  geom_bar(stat="identity", position = "dodge") +
+  facet_grid(metric~.) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+ggplot(access_by_quintile_hh,
+       aes(x=year, y=access, color=wealth_quintile)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="")
+
+
+ggplot(access_by_quintile_hh,
+       aes(x=year, y=access, fill=wealth_quintile)) +
+  geom_bar(stat="identity", position="dodge") +
+  # geom_tile() +
+  #geom_text(aes(label=round(access, 2))) +
+  # scale_fill_distiller(palette = "YlGnBu", direction=1) +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="")
+
+ggplot(access_by_quintile_hh,
+       aes(x=year, y=wealth_quintile, fill=access)) +
+  geom_tile() +
+  #geom_text(aes(label=round(access, 2))) +
+  scale_fill_distiller(palette = "YlGnBu", direction=1) +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="")
 
 
 
