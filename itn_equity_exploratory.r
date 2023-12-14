@@ -38,10 +38,11 @@ extra_digit_surveys <- c("AO2011MIS",
                          "SN2016DHS",
                          "ZW2015DHS")
 
-# itn_data[dhs_survey_id %in% extra_digit_surveys,
-#          wealth_index_score:= as.integer(wealth_index_score/10)]
-# 
+itn_data[dhs_survey_id %in% extra_digit_surveys,
+         wealth_index_score:= as.integer(wealth_index_score/10)]
 
+# also divide wealth index by 100,000 to get the actual value as advised by camilo
+itn_data[,wealth_index_score:=wealth_index_score/100000]
 
 
 # calculate wealth quintile three different ways: as it comes out of the box,
@@ -240,6 +241,15 @@ ggplot(explore_surprising,
   labs(x="",
        y="Wealth Index Score")
 
+# How big is the discrepancy between the highest and lowest wealth quintiles?
+find_wealth_gap <- dcast.data.table(
+                    wealth_by_quintile[metric=="wealth_quintile_by_household" &
+                                         wealth_quintile %in% c("Poorest", "Richest")],
+                    country_name + dhs_survey_id ~ wealth_quintile, value.var = "wealth_index_score")
+find_wealth_gap[, wealth_gap:=Richest-Poorest]
+ggplot(find_wealth_gap, aes(x=wealth_gap)) +
+  geom_density()
+
 
 ##### What does ITN Access by wealth quintile look like?
 access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
@@ -248,7 +258,7 @@ access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
                                   ids = "clusterid",
                                   weight_vals = weight_vals,
                                   metric_vals = "access",
-                                  by_vals = c("wealth_quintile_by_population", "wealth_quintile_by_household")
+                                  by_vals = c("wealth_quintile_by_population", "wealth_quintile_by_household", "wealth_quintile_dhs")
   )
   setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
   these_means[, dhs_survey_id:=this_survey]
@@ -261,7 +271,28 @@ access_by_quintile <- access_by_quintile[(metric=="wealth_quintile_by_household"
 
 access_by_quintile <-merge(access_by_quintile, country_survey_map, all.x=T)
 access_by_quintile[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id))]
+
+compare_hh_to_dhs <- access_by_quintile[metric %in% c("wealth_quintile_by_household",
+                                                      "wealth_quintile_dhs")]
+compare_hh_to_dhs <- dcast.data.table(compare_hh_to_dhs, 
+                                      country_name + dhs_survey_id + year + wealth_quintile ~ metric,
+                                      value.var = "access")
+compare_hh_to_dhs[, diff:=wealth_quintile_by_household-wealth_quintile_dhs]
+compare_hh_to_dhs[, is_greater:=wealth_quintile_by_household>wealth_quintile_dhs]
+
+ggplot(compare_hh_to_dhs, 
+       aes(x=wealth_quintile_dhs,
+           y=wealth_quintile_by_household,
+           color=is_greater)) +
+  geom_abline() +
+  geom_point() +
+  facet_wrap(~wealth_quintile) +
+  theme_minimal() +
+  labs(x="ITN Access w/ Original DHS Weighting",
+       y="ITN Access w/ Household-Level Weighting")
+
 access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
+
 
 ggplot(access_by_quintile_hh[country_name=="Tanzania"],
        aes(x=dhs_survey_id, y=access, fill=wealth_quintile)) +
@@ -273,10 +304,10 @@ ggplot(access_by_quintile_hh[country_name=="Tanzania"],
 ggplot(access_by_quintile_hh,
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
-  geom_point() +
+  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
   facet_wrap(~country_name)+
   theme_minimal() +
-  labs(x="", y="")
+  labs(x="", y="ITN Access")
 
 
 ggplot(access_by_quintile_hh,
@@ -297,6 +328,75 @@ ggplot(access_by_quintile_hh,
   facet_wrap(~country_name)+
   theme_minimal() +
   labs(x="", y="")
+
+# Let's split these up by number of surveys to see if we can tell a clearer story
+access_by_quintile_hh[, survey_count:=.N, by=.(country_name, wealth_quintile)]
+# prettier survey names
+access_by_quintile_hh[, survey_label:= paste(country_name, year)]
+
+single_survey <- access_by_quintile_hh[survey_count==1]
+ggplot(single_survey,
+       aes(x=wealth_quintile, y=reorder(survey_label, access), fill=access)) +
+  geom_tile() +
+  geom_text(aes(label=round(access, 2))) +
+  scale_fill_distiller(palette = "YlGnBu", direction=1) +
+  theme_minimal() +
+  labs(x="", y="",
+       title="ITN Access by Wealth Quintile,\nSingle-Survey Countries")
+
+double_survey <-  access_by_quintile_hh[survey_count==2]
+ggplot(double_survey,
+       aes(x=year, y=access, color=wealth_quintile)) +
+  geom_line() +
+  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="ITN Access")
+
+more_surveys <- access_by_quintile_hh[survey_count>2]
+ggplot(more_surveys,
+       aes(x=year, y=access, color=wealth_quintile)) +
+  geom_line() +
+  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="ITN Access")
+
+
+# Go back to basics: how are ITN access and wealth distributed in the survey itself?
+ggplot(itn_data, aes(x=wealth_index_score)) +
+  geom_density(aes(color=wealth_quintile_by_household)) +
+  facet_wrap(~dhs_survey_id, scales="free") +
+  theme_minimal()
+
+# And access?
+ggplot(itn_data, aes(x=access)) +
+  # geom_density() +
+  geom_density() +
+  # facet_wrap(~dhs_survey_id) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x="ITN Access",
+       y="Density",
+       title="Distribution of ITN Access by Household Across All Surveys")
+
+# Let's compare wealth inequality to itn access inequality
+hhsize_by_quintile[ , quintile_size_rank := order(order(n_dejure_pop, decreasing = FALSE)), 
+                    by=.(metric,dhs_survey_id) ]
+hhsize_by_quintile[ , quintile_size_factor := factor(quintile_size_rank,
+                                                     labels=c("Smallest", "Smaller", "Middle", "Bigger", "Biggest"))]
+
+
+access_by_quintile_hh[ , access_rank := order(order(access, decreasing = FALSE)), 
+                       by=.(dhs_survey_id) ]
+access_by_quintile_hh[ , access_rank_factor := factor(access_rank,
+                                                      labels=c("Lowest Access", 
+                                                               "Lower Access", 
+                                                               "Middle Access", 
+                                                               "Higher Access",
+                                                               "Highest Access"))]
+
+
 
 
 
