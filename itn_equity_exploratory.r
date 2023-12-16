@@ -25,6 +25,44 @@ source(function_fname)
 
 # load data 
 itn_data <- fread(input_data_fname)
+
+# let's restrict to countries in Africa
+africa_list <- c("Angola",
+                 "Benin",
+                 "Burkina Faso",
+                 "Burundi",
+                 "Cameroon",
+                 "Chad",
+                 "Comoros",
+                 "Congo",
+                 "Congo Democratic Republic",
+                 "Cote d'Ivoire",
+                 "Eswatini",
+                 "Gabon",
+                 "Gambia",
+                 "Ghana",
+                 "Guinea",
+                 "Kenya",
+                 "Liberia",
+                 "Madagascar",
+                 "Malawi",
+                 "Mali",
+                 "Mauritania",
+                 "Mozambique",
+                 "Namibia",
+                 "Niger",
+                 "Nigeria",
+                 "Rwanda",
+                 "Sao Tome and Principe",
+                 "Senegal",
+                 "Sierra Leone",
+                 "Tanzania",
+                 "Togo",
+                 "Uganda",
+                 "Zambia",
+                 "Zimbabwe")
+itn_data <- itn_data[country_name %in% africa_list]
+
 country_survey_map <- unique(itn_data[, list(dhs_survey_id, country_name)])
 
 
@@ -231,24 +269,19 @@ explore_surprising_full[, final_digit:= wealth_index_score %% 10]
 unique(explore_surprising_full$final_digit)
 # it's zero everywhere except IA2020DHS, where every digit ends in one?? 
 
-ggplot(explore_surprising,
-       aes(x=wealth_quintile, y=wealth_index_score, fill=wealth_quintile)) +
-  geom_bar(stat="identity", position = "dodge") +
-  geom_text(data=explore_surprising[wealth_quintile=="Middle"], y=1.5e+06, aes(label=dhs_survey_id)) + 
-  facet_grid(country_name ~ survey_count) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
-  labs(x="",
-       y="Wealth Index Score")
 
-# How big is the discrepancy between the highest and lowest wealth quintiles?
-find_wealth_gap <- dcast.data.table(
-                    wealth_by_quintile[metric=="wealth_quintile_by_household" &
-                                         wealth_quintile %in% c("Poorest", "Richest")],
-                    country_name + dhs_survey_id ~ wealth_quintile, value.var = "wealth_index_score")
-find_wealth_gap[, wealth_gap:=Richest-Poorest]
-ggplot(find_wealth_gap, aes(x=wealth_gap)) +
-  geom_density()
+  # ggplot(explore_surprising,
+  #        aes(x=wealth_quintile, y=wealth_index_score, fill=wealth_quintile)) +
+  #   geom_bar(stat="identity", position = "dodge") +
+  #   geom_text(data=explore_surprising[wealth_quintile=="Middle"], y=1.5e+06, aes(label=dhs_survey_id)) + 
+  #   facet_grid(country_name ~ survey_count) +
+  #   theme_minimal() +
+  #   theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  #   labs(x="",
+  #        y="Wealth Index Score")
+
+
+
 
 
 ##### What does ITN Access by wealth quintile look like?
@@ -381,12 +414,6 @@ ggplot(itn_data, aes(x=access)) +
        title="Distribution of ITN Access by Household Across All Surveys")
 
 # Let's compare wealth inequality to itn access inequality
-hhsize_by_quintile[ , quintile_size_rank := order(order(n_dejure_pop, decreasing = FALSE)), 
-                    by=.(metric,dhs_survey_id) ]
-hhsize_by_quintile[ , quintile_size_factor := factor(quintile_size_rank,
-                                                     labels=c("Smallest", "Smaller", "Middle", "Bigger", "Biggest"))]
-
-
 access_by_quintile_hh[ , access_rank := order(order(access, decreasing = FALSE)), 
                        by=.(dhs_survey_id) ]
 access_by_quintile_hh[ , access_rank_factor := factor(access_rank,
@@ -396,9 +423,101 @@ access_by_quintile_hh[ , access_rank_factor := factor(access_rank,
                                                                "Higher Access",
                                                                "Highest Access"))]
 
+# merge on wealth inequity
+setnames(access_by_quintile_hh, "se", "se_access")
+setnames(wealth_by_quintile, "se", "se_wealth_index_score")
+setkey(access_by_quintile_hh, NULL)
+setkey(wealth_by_quintile, NULL)
+wealth_by_quintile[, survey_count:=NULL]
+
+wealth_and_access <- merge(access_by_quintile_hh, wealth_by_quintile, all.x=T)
+
+ggplot(wealth_and_access[survey_count==1],
+       aes(x=wealth_quintile, y=reorder(survey_label, wealth_index_score), fill=wealth_index_score)) +
+  geom_tile() +
+  geom_text(aes(label=round(wealth_index_score, 2))) +
+  scale_fill_distiller(palette = "YlGnBu", direction=1) +
+  theme_minimal() +
+  labs(x="", y="",
+       title="Wealth Index by Wealth Quintile,\nSingle-Survey Countries")
+
+ggplot(wealth_and_access[survey_count==2],
+       aes(x=year, y=wealth_index_score, color=wealth_quintile)) +
+  geom_hline(yintercept=0) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="Wealth Index")
+
+ggplot(wealth_and_access[survey_count>2],
+       aes(x=year, y=wealth_index_score, color=wealth_quintile)) +
+  geom_hline(yintercept=0) +
+  geom_line() +
+  geom_pointrange(aes(ymin=wealth_index_score-se_wealth_index_score, ymax=wealth_index_score+se_wealth_index_score)) +
+  facet_wrap(~country_name)+
+  theme_minimal() +
+  labs(x="", y="Wealth Index")
+
+# compare wealth index to access--poorly informative
+ggplot(wealth_and_access, aes(x=wealth_index_score, y=access)) +
+  geom_point(aes(color=access_rank_factor)) +
+  facet_wrap(~wealth_quintile)+
+  theme_minimal() 
+
+# what is the distribution of surveys across wealth quintile and access? 
+count_surveys_by_group <- wealth_and_access[, list(count=.N), 
+                                            by=.(wealth_quintile, access_rank_factor)]
+
+ggplot(count_surveys_by_group, aes(x=wealth_quintile, y=access_rank_factor)) +
+  geom_tile(aes(fill=count)) +
+  geom_text(aes(label=count)) +
+  scale_fill_distiller(palette = "Purples", 
+                       direction = 1,
+                      name="No.\nof Surveys") +
+  theme_minimal() +
+  labs(x="",
+       y="")
 
 
+# How big is the discrepancy between the highest and lowest wealth quintiles?
+find_wealth_gap <- dcast.data.table(
+  wealth_and_access[wealth_quintile %in% c("Poorest", "Richest")],
+  country_name + dhs_survey_id ~ wealth_quintile, value.var = "wealth_index_score")
+find_wealth_gap[, wealth_gap:=Richest-Poorest]
+ggplot(find_wealth_gap, aes(x=wealth_gap)) +
+  geom_density()
 
+find_access_gap <- dcast.data.table(
+  wealth_and_access[access_rank_factor %in% c("Lowest Access", "Highest Access")],
+  country_name + dhs_survey_id ~ access_rank_factor, value.var = "access"
+  )
+find_access_gap[, access_gap:=`Highest Access` - `Lowest Access`]
+ggplot(find_access_gap, aes(x=access_gap)) +
+  geom_density()
+
+all_gaps <- merge(find_access_gap, find_wealth_gap)
+
+# merge on wealth quintile and survey label
+all_gaps <- merge(wealth_and_access[access_rank_factor %in% c("Lowest Access", "Highest Access"),
+                                    list(country_name, 
+                                           dhs_survey_id, 
+                                           survey_label,
+                                           year,
+                                         wealth_quintile,
+                                         access_rank_factor)],
+                  all_gaps, 
+                  by=c("country_name",
+                       "dhs_survey_id"))
+
+all_gaps[, access_rank_factor:= paste(access_rank_factor, " Wealth Quintile")]
+all_gaps <- dcast.data.table(all_gaps, country_name + dhs_survey_id +survey_label + year + `Lowest Access` + `Highest Access` + access_gap + Poorest + Richest + wealth_gap ~ access_rank_factor, 
+                 value.var = "wealth_quintile" )
+
+ggplot(all_gaps) +
+  geom_linerange(aes(x=wealth_gap, ymin=`Lowest Access`, ymax=`Highest Access`)) +
+  facet_grid(`Highest Access  Wealth Quintile` ~ `Lowest Access  Wealth Quintile`) +
+  theme_minimal()
 
 # according to the DHS docs: chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://dhsprogram.com/pubs/pdf/CR6/CR6.pdf
 # The cut points in the wealth index at which to form the quintiles are
