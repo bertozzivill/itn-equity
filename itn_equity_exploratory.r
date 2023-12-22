@@ -496,6 +496,7 @@ find_access_gap[, access_gap:=`Highest Access` - `Lowest Access`]
 ggplot(find_access_gap, aes(x=access_gap)) +
   geom_density()
 
+
 all_gaps <- merge(find_access_gap, find_wealth_gap)
 
 # merge on wealth quintile and survey label
@@ -518,6 +519,24 @@ ggplot(all_gaps) +
   geom_linerange(aes(x=wealth_gap, ymin=`Lowest Access`, ymax=`Highest Access`)) +
   facet_grid(`Highest Access  Wealth Quintile` ~ `Lowest Access  Wealth Quintile`) +
   theme_minimal()
+
+ggplot(all_gaps, aes(x=`Highest Access`, y=access_gap, color=year)) +
+  geom_point() +
+  theme_minimal()
+
+ggplot(all_gaps, aes(x=access_gap,
+                     ymin=`Lowest Access`,
+                     ymax=`Highest Access`)) +
+  geom_linerange() +
+  theme_minimal() 
+
+# ok, looking at size of access gap is getting interesting.
+ggplot(all_gaps, aes(x=year, y=access_gap)) +
+  geom_line() + 
+  geom_point() +
+  facet_wrap(~country_name) +
+  theme_minimal()
+
 
 # according to the DHS docs: chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://dhsprogram.com/pubs/pdf/CR6/CR6.pdf
 # The cut points in the wealth index at which to form the quintiles are

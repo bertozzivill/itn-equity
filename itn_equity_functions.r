@@ -6,7 +6,6 @@
 ## Collect functions for the ITN equity project
 ##############################################################################################################
 
-
 # it seems like Hmisc::wtd.quantile() has major bugs https://github.com/harrelfe/Hmisc/issues/97... 
 # try this solution from that github issue
 wtd.quantile<- function (x, weights = NULL, probs = c(0, 0.25, 0.5, 0.75, 1),
@@ -51,6 +50,76 @@ wtd.quantile<- function (x, weights = NULL, probs = c(0, 0.25, 0.5, 0.75, 1),
   w <- wtd.Ecdf(x, weights, na.rm = na.rm, type = type, normwt = normwt)
   structure(approx(w$ecdf, w$x, xout = probs, rule = 2)$y,
             names = nams)
+}
+
+wtd.table<- function (x, weights = NULL, type = c("list", "table"), normwt = FALSE,
+                      na.rm = TRUE) {
+  # Function taken from HMISC, but issue solved which is documented here: https://github.com/harrelfe/Hmisc/issues/97#issuecomment-429634634
+  # p_load(timeDate)
+  type <- match.arg(type)
+  if (!length(weights))
+    weights <- rep(1, length(x))
+  isdate <- ( class(x)[1]=="Date"  | class(x)[1]=="POSIXct") ### MODIFIED
+  ax <- attributes(x)
+  ax$names <- NULL
+  if (is.character(x))
+    x <- as.factor(x)
+  lev <- levels(x)
+  x <- unclass(x)
+  if (na.rm) {
+    s <- !is.na(x + weights)
+    x <- x[s, drop = FALSE]
+    weights <- weights[s]
+  }
+  n <- length(x)
+  if (normwt)
+    weights <- weights * length(x)/sum(weights)
+  i <- order(x)
+  x <- x[i]
+  weights <- weights[i]
+  if (anyDuplicated(x)) {
+    weights <- tapply(weights, x, sum)
+    if (length(lev)) {
+      levused <- lev[sort(unique(x))]
+      if ((length(weights) > length(levused)) && any(is.na(weights)))
+        weights <- weights[!is.na(weights)]
+      if (length(weights) != length(levused))
+        stop("program logic error")
+      names(weights) <- levused
+    }
+    if (!length(names(weights)))
+      stop("program logic error")
+    if (type == "table")
+      return(weights)
+    #x <-  all.is.numeric(names(weights), "vector")#  modified: commented out. function checked whether all are numeric and if yes returned the weights
+    if (isdate)      attributes(x) <- c(attributes(x), ax)
+    x_out<- as.numeric(names(weights))
+    names(weights) <- NULL
+    return(list(x = x_out, sum.of.weights = weights))
+  }
+  xx <- x
+  if (isdate)
+    attributes(xx) <- c(attributes(xx), ax)
+  if (type == "list")
+    list(x = if (length(lev)) lev[x] else xx, sum.of.weights = weights)
+  else {
+    names(weights) <- if (length(lev))
+      lev[x]
+    else xx
+    weights
+  }
+}
+
+wtd.mean <- function (x, weights = NULL, normwt = "ignored", na.rm = TRUE) {
+  # Function taken from HMISC, but issue solved which is documented here: https://github.com/harrelfe/Hmisc/issues/97#issuecomment-429634634
+  if (!length(weights))
+    return(mean(x, na.rm = na.rm))
+  if (na.rm) {
+    s <- !is.na(x + weights)
+    x <- x[s]
+    weights <- weights[s]
+  }
+  sum(weights * x)/sum(weights)
 }
 
 
