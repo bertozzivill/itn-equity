@@ -12,6 +12,7 @@ library(ggplot2)
 library(survey)
 # library(stringr)
 library(wesanderson)
+library(PNWColors)
 
 options(digits=4)
 
@@ -339,6 +340,8 @@ ggplot(access_by_quintile_hh,
   geom_line() +
   geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
   facet_wrap(~country_name)+
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
   theme_minimal() +
   labs(x="", y="ITN Access")
 
@@ -462,7 +465,7 @@ ggplot(wealth_and_access[survey_count>2],
 # compare wealth index to access--poorly informative
 ggplot(wealth_and_access, aes(x=wealth_index_score, y=access)) +
   geom_point(aes(color=access_rank_factor)) +
-  facet_wrap(~wealth_quintile)+
+  facet_grid(~wealth_quintile)+
   theme_minimal() 
 
 # what is the distribution of surveys across wealth quintile and access? 
@@ -520,24 +523,60 @@ ggplot(all_gaps) +
   facet_grid(`Highest Access  Wealth Quintile` ~ `Lowest Access  Wealth Quintile`) +
   theme_minimal()
 
+ggplot(all_gaps, aes(x=`Lowest Access`, y=access_gap, color=year)) +
+  geom_point(size=2) +
+  scale_color_distiller(palette = "YlGn", direction=1) + 
+  theme_minimal() +
+  labs(y="Access Gap",
+       title="Access Gap, by Lowest Access")
+
 ggplot(all_gaps, aes(x=`Highest Access`, y=access_gap, color=year)) +
-  geom_point() +
-  theme_minimal()
+  geom_point(size=2) +
+  scale_color_distiller(palette = "YlGn", direction=1) + 
+  theme_minimal() +
+  labs(y="Access Gap",
+       title="Access Gap, by Highest Access")
 
 ggplot(all_gaps, aes(x=access_gap,
                      ymin=`Lowest Access`,
                      ymax=`Highest Access`)) +
   geom_linerange() +
-  theme_minimal() 
+  geom_point(aes(y=`Lowest Access`, color=`Lowest Access  Wealth Quintile`), size=2)+
+  geom_point(aes(y=`Highest Access`, color=`Highest Access  Wealth Quintile`), size=2)+
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  facet_grid(~`Highest Access  Wealth Quintile`) +
+  theme_minimal() +
+  labs(x="Access Gap",
+       y="Access",
+       title="Access Ranges by Size of Access Gap")
+
+ggplot(all_gaps, aes(x=year,
+                     ymin=`Lowest Access`,
+                     ymax=`Highest Access`)) +
+  geom_linerange() +
+  geom_point(aes(y=`Lowest Access`, color=`Lowest Access  Wealth Quintile`), size=2)+
+  geom_point(aes(y=`Highest Access`, color=`Highest Access  Wealth Quintile`), size=2)+
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  facet_wrap(~country_name) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(y="Access",
+       title="Access Ranges over Country and Time")
 
 # ok, looking at size of access gap is getting interesting.
 ggplot(all_gaps, aes(x=year, y=access_gap)) +
   geom_line() + 
-  geom_point() +
+  geom_point(aes(color=`Highest Access  Wealth Quintile`), size=2) +
   facet_wrap(~country_name) +
-  theme_minimal()
-
-
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile\nwith Highest Access") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(y="Access",
+       title="Access Gap over Country and Time")
+  
 # according to the DHS docs: chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://dhsprogram.com/pubs/pdf/CR6/CR6.pdf
 # The cut points in the wealth index at which to form the quintiles are
 # calculated by obtaining a weighted frequency distribution of households,
