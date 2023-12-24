@@ -343,7 +343,9 @@ ggplot(access_by_quintile_hh,
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
   theme_minimal() +
-  labs(x="", y="ITN Access")
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="", y="ITN Access",
+       title="ITN Access by Country and Time")
 
 
 ggplot(access_by_quintile_hh,
