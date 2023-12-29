@@ -34,7 +34,11 @@ weight_vals <- c("hh_sample_wt", "hh_sample_wt_times_hh")
 
 # load national-level pfpr data
 pfpr_data <- fread(file.path(parent_dir, "primary_data/National_Unit-data.csv"))
-pfpr_data <- pfpr_data[Metric=="Infection Prevalence"]
+pfpr_data[ISO3=="CIV", Name:="Cote d'Ivoire"]
+pfpr_data[ISO3=="COD", Name:="Congo Democratic Republic"]
+pfpr_data[ISO3=="STP", Name:="Sao Tome and Principe"]
+pfpr_data[ISO3=="SWZ", Name:="Eswatini"]
+pfpr_data <- pfpr_data[Metric=="Infection Prevalence" & Name %in% country_survey_map$country_name]
 
 ggplot(pfpr_data, aes(x=Year, y=Value)) +
   geom_line() +
@@ -133,6 +137,28 @@ ggplot(access_by_quintile_hh,
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
   geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  facet_wrap(~country_name)+
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="", y="ITN Access",
+       title="ITN Access by Country and Time")
+
+# merge pfpr onto this
+access_and_pfpr <- merge(access_by_quintile_hh,
+                         pfpr_data[, list(country_name=Name,
+                                          year=Year,
+                                          pfpr=Value/100)],
+                         by=c("country_name", "year"),
+                         all.x=T)
+
+ggplot(access_and_pfpr,
+       aes(x=year, y=access, color=wealth_quintile)) +
+  #geom_line() +
+  #geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  geom_line(aes(y=pfpr), color="black") +
+  geom_point(aes(y=pfpr), color="black") +
   facet_wrap(~country_name)+
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
