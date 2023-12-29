@@ -31,6 +31,15 @@ country_survey_map <- unique(itn_data[, list(dhs_survey_id, country_name)])
 
 unique_surveys <- unique(itn_data$dhs_survey_id)
 weight_vals <- c("hh_sample_wt", "hh_sample_wt_times_hh")
+wealth_quintile_levels <- c("Poorest",
+                            "Poorer",
+                            "Middle",
+                            "Richer",
+                            "Richest")
+
+# convert wealth quintile columns to factor
+to_convert_cols <- names(itn_data)[names(itn_data) %like% "wealth_quintile"]
+itn_data[, c(to_convert_cols) := lapply(.SD, factor, levels=wealth_quintile_levels), .SDcols = to_convert_cols]
 
 # load national-level pfpr data
 pfpr_data <- fread(file.path(parent_dir, "primary_data/National_Unit-data.csv"))
@@ -155,8 +164,8 @@ access_and_pfpr <- merge(access_by_quintile_hh,
 
 ggplot(access_and_pfpr,
        aes(x=year, y=access, color=wealth_quintile)) +
-  #geom_line() +
-  #geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  geom_line() +
+  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
   geom_line(aes(y=pfpr), color="black") +
   geom_point(aes(y=pfpr), color="black") +
   facet_wrap(~country_name)+
@@ -166,6 +175,11 @@ ggplot(access_and_pfpr,
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="", y="ITN Access",
        title="ITN Access by Country and Time")
+
+
+ggplot(access_and_pfpr[!is.na(pfpr)], aes(x=wealth_quintile, y=as.factor(pfpr), fill=access)) +
+  geom_tile() + 
+  scale_fill_distiller(palette = "YlGnBu", direction=1)
 
 
 # Let's split these up by number of surveys to see if we can tell a clearer story
