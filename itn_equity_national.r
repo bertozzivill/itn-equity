@@ -25,12 +25,23 @@ input_data_fname <- file.path(parent_dir, "primary_data/itn_equity_cleaned.csv")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
 
-# load data 
+# load itn data 
 itn_data <- fread(input_data_fname)
 country_survey_map <- unique(itn_data[, list(dhs_survey_id, country_name)])
 
 unique_surveys <- unique(itn_data$dhs_survey_id)
 weight_vals <- c("hh_sample_wt", "hh_sample_wt_times_hh")
+
+# load national-level pfpr data
+pfpr_data <- fread(file.path(parent_dir, "primary_data/National_Unit-data.csv"))
+pfpr_data <- pfpr_data[Metric=="Infection Prevalence"]
+
+ggplot(pfpr_data, aes(x=Year, y=Value)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~Name)
+
+
 
 ##### What does median household wealth by quintile look like under the different metrics?
 
