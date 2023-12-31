@@ -54,6 +54,21 @@ ggplot(pfpr_data, aes(x=Year, y=Value)) +
   geom_point() +
   facet_wrap(~Name)
 
+##### Find national-level int access for each survey
+national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
+  
+  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
+                                  ids = "clusterid",
+                                  weight_vals = "hh_sample_wt",
+                                  metric_vals = "access"
+  )
+  these_means[, dhs_survey_id:=this_survey]
+}))
+# I have no idea why, but converting a svystat object to a data 
+# table renames the "SE" column to "access"... correct this 
+national_access <- national_access[, list(dhs_survey_id, 
+                                          national_access=mean,
+                                          national_access_se=access)]
 
 
 ##### What does median household wealth by quintile look like under the different metrics?
@@ -154,7 +169,7 @@ ggplot(access_by_quintile_hh,
   labs(x="", y="ITN Access",
        title="ITN Access by Country and Time")
 
-# merge pfpr onto this
+# merge pfpr and national access onto this
 access_and_pfpr <- merge(access_by_quintile_hh,
                          pfpr_data[, list(country_name=Name,
                                           year=Year,
