@@ -177,6 +177,13 @@ access_and_pfpr <- merge(access_by_quintile_hh,
                          by=c("country_name", "year"),
                          all.x=T)
 
+access_and_pfpr <- merge(access_and_pfpr, national_access, by="dhs_survey_id", all.x=T)
+
+ggplot(access_and_pfpr, aes(x=pfpr, y=national_access)) +
+  geom_point(aes(color=year)) +
+  facet_wrap(~country_name)
+
+
 ggplot(access_and_pfpr,
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
