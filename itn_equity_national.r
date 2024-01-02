@@ -14,6 +14,7 @@ library(ggplot2)
 library(survey)
 library(wesanderson)
 library(PNWColors)
+library(geofacet)
 
 options(digits=4)
 
@@ -49,10 +50,15 @@ pfpr_data[ISO3=="STP", Name:="Sao Tome and Principe"]
 pfpr_data[ISO3=="SWZ", Name:="Eswatini"]
 pfpr_data <- pfpr_data[Metric=="Infection Prevalence" & Name %in% country_survey_map$country_name]
 
+# load geofacet 
+pfpr_data[, name:=Name]
+ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
+
 ggplot(pfpr_data, aes(x=Year, y=Value)) +
   geom_line() +
   geom_point() +
-  facet_wrap(~Name)
+  facet_geo(~name, grid = ssa_grid, label="name")
+
 
 ##### Find national-level int access for each survey
 national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
@@ -156,6 +162,7 @@ ggplot(compare_hh_to_dhs,
        y="ITN Access w/ Household-Level Weighting")
 
 access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
+access_by_quintile_hh[, name:=country_name]
 
 ggplot(access_by_quintile_hh,
        aes(x=year, y=access, color=wealth_quintile)) +
@@ -414,3 +421,17 @@ ggplot(all_gaps, aes(x=year, y=access_gap)) +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(y="Access",
        title="Access Gap over Country and Time")
+
+
+# look at access gap vs national access and prevalence 
+
+all_gaps <- merge(all_gaps, national_access, by="dhs_survey_id", all.x=T)
+all_gaps <- merge(all_gaps, pfpr_data[, list(country_name=Name,
+                                 year=Year,
+                                 pfpr=Value/100)],
+      by=c("country_name", "year"),
+      all.x=T)
+
+ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
+  geom_point()
+
