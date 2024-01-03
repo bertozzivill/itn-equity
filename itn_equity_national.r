@@ -48,17 +48,25 @@ pfpr_data[ISO3=="CIV", Name:="Cote d'Ivoire"]
 pfpr_data[ISO3=="COD", Name:="Congo Democratic Republic"]
 pfpr_data[ISO3=="STP", Name:="Sao Tome and Principe"]
 pfpr_data[ISO3=="SWZ", Name:="Eswatini"]
-pfpr_data <- pfpr_data[Metric=="Infection Prevalence" & Name %in% country_survey_map$country_name]
+pfpr_data <- pfpr_data[Metric=="Infection Prevalence" & Name %in% country_survey_map$country_name,
+                       list(country_name=Name,
+                            iso3=ISO3,
+                            name=Name,
+                            year=Year,
+                            pfpr=Value/100)]
+
+
 
 # load geofacet 
-pfpr_data[, name:=Name]
 ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
-ggplot(pfpr_data, aes(x=Year, y=Value)) +
+ggplot(pfpr_data, aes(x=year, y=pfpr)) +
   geom_line() +
   geom_point() +
   facet_geo(~name, grid = ssa_grid, label="name")
 
+# use this to add iso3 to the country map
+country_survey_map <- merge(country_survey_map, unique(pfpr_data[, list(country_name, iso3)]), all.x=T)
 
 ##### Find national-level int access for each survey
 national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
@@ -75,6 +83,7 @@ national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
 national_access <- national_access[, list(dhs_survey_id, 
                                           national_access=mean,
                                           national_access_se=access)]
+
 
 
 ##### What does median household wealth by quintile look like under the different metrics?
@@ -100,24 +109,6 @@ wealth_by_quintile <- wealth_by_quintile[(metric=="wealth_quintile_by_household"
 wealth_by_quintile <- merge(wealth_by_quintile, country_survey_map, all.x = T)
 wealth_by_quintile[, survey_count:= seq_len(.N), by=.(metric, wealth_quintile, country_name)]
 
-# order by the highest index value for the highest quintile
-sort_wealth_quintile <- wealth_by_quintile[wealth_quintile=="Richest"]
-sort_wealth_quintile <- sort_wealth_quintile[order(metric, wealth_index_score)]
-sort_wealth_quintile[, wealth_index_order:=seq_len(.N), by=.(metric)]
-wealth_by_quintile_ordered <- merge(wealth_by_quintile, sort_wealth_quintile[, list(metric,
-                                                                                    dhs_survey_id, 
-                                                                                    wealth_index_order)],
-                                    by=c("metric", "dhs_survey_id"))
-
-ggplot(wealth_by_quintile_ordered[metric=="wealth_quintile_by_household"],
-       aes(x=wealth_index_order, y=wealth_index_score, fill=wealth_quintile)) +
-  geom_bar(stat="identity", position = "dodge") +
-  facet_grid(metric~.) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
-
-
-
 
 ##### What does ITN Access by wealth quintile look like?
 access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
@@ -142,25 +133,7 @@ access_by_quintile <- access_by_quintile[(metric=="wealth_quintile_by_household"
 access_by_quintile <-merge(access_by_quintile, country_survey_map, all.x=T)
 access_by_quintile[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id))]
 
-compare_hh_to_dhs <- access_by_quintile[metric %in% c("wealth_quintile_by_household",
-                                                      "wealth_quintile_dhs")]
-compare_hh_to_dhs <- dcast.data.table(compare_hh_to_dhs, 
-                                      country_name + dhs_survey_id + year + wealth_quintile ~ metric,
-                                      value.var = "access")
-compare_hh_to_dhs[, diff:=wealth_quintile_by_household-wealth_quintile_dhs]
-compare_hh_to_dhs[, is_greater:=wealth_quintile_by_household>wealth_quintile_dhs]
-
-ggplot(compare_hh_to_dhs, 
-       aes(x=wealth_quintile_dhs,
-           y=wealth_quintile_by_household,
-           color=is_greater)) +
-  geom_abline() +
-  geom_point() +
-  facet_wrap(~wealth_quintile) +
-  theme_minimal() +
-  labs(x="ITN Access w/ Original DHS Weighting",
-       y="ITN Access w/ Household-Level Weighting")
-
+# choose to focus on the houshold-level metric for comparability
 access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
 access_by_quintile_hh[, name:=country_name]
 
@@ -179,18 +152,16 @@ ggplot(access_by_quintile_hh,
 
 # merge pfpr and national access onto this
 access_and_pfpr <- merge(access_by_quintile_hh,
-                         pfpr_data[, list(country_name=Name,
-                                          year=Year,
-                                          pfpr=Value/100)],
-                         by=c("country_name", "year"),
+                         pfpr_data,
+                         by=c("country_name", "name", "iso3", "year"),
                          all.x=T)
 
-access_and_pfpr <- merge(access_and_pfpr, national_access, by="dhs_survey_id", all.x=T)
+access_and_pfpr <- merge(access_and_pfpr, national_access, 
+                         by= c("dhs_survey_id"), all.x=T)
 
 ggplot(access_and_pfpr, aes(x=pfpr, y=national_access)) +
   geom_point(aes(color=year)) +
   facet_geo(~name, grid = ssa_grid, label="name")
-  # facet_wrap(~country_name)
 
 
 ggplot(access_and_pfpr,
@@ -199,7 +170,6 @@ ggplot(access_and_pfpr,
   geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
   geom_line(aes(y=pfpr), color="black") +
   geom_point(aes(y=pfpr), color="black") +
-  # facet_wrap(~country_name)+
   facet_geo(~name, grid = ssa_grid, label="name") + 
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
@@ -208,7 +178,7 @@ ggplot(access_and_pfpr,
   labs(x="", y="ITN Access",
        title="ITN Access by Country and Time")
 
-
+# todo: make this story clearer
 ggplot(access_and_pfpr[!is.na(pfpr)], aes(x=wealth_quintile, y=as.factor(pfpr), fill=access)) +
   geom_tile() + 
   scale_fill_distiller(palette = "YlGnBu", direction=1)
@@ -227,50 +197,6 @@ ggplot(access_by_quintile_hh[survey_count==1],
   theme_minimal() +
   labs(x="", y="",
        title="ITN Access by Wealth Quintile,\nSingle-Survey Countries")
-
-ggplot(access_by_quintile_hh[survey_count==2],
-       aes(x=year, y=access, color=wealth_quintile)) +
-  geom_line() +
-  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
-  facet_wrap(~country_name)+
-  theme_minimal() +
-  labs(x="", y="ITN Access")
-
-ggplot(access_by_quintile_hh[survey_count>2],
-       aes(x=year, y=access, color=wealth_quintile)) +
-  geom_line() +
-  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
-  facet_wrap(~country_name)+
-  theme_minimal() +
-  labs(x="", y="ITN Access")
-
-ggplot(access_by_quintile_hh,
-       aes(x=year, y=access, color=wealth_quintile)) +
-  geom_line() +
-  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
-  # facet_wrap(~country_name)+
-  facet_geo(~name, grid = ssa_grid, label="name") + 
-  theme_minimal() +
-  labs(x="", y="ITN Access")
-
-
-# what does this look like when you order by wealth index score? 
-
-access_with_wealth_order <- merge(access_by_quintile_hh, sort_wealth_quintile[, list(metric,
-                                                                                    dhs_survey_id, 
-                                                                                    wealth_index_order)],
-                                    by=c("metric", "dhs_survey_id"),
-                                  all.x=T)
-
- 
-  
-
-ggplot(access_with_wealth_order,
-       aes(x=wealth_index_order, y=access, fill=wealth_quintile)) +
-  geom_bar(stat="identity", position = "dodge") +
-  facet_grid(metric~.) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
 
 
 ### Let's compare wealth inequality to itn access inequality
@@ -310,23 +236,6 @@ ggplot(wealth_and_access,
   theme_minimal() +
   labs(x="", y="Wealth Index")
 
-ggplot(wealth_and_access[survey_count>2],
-       aes(x=year, y=wealth_index_score, color=wealth_quintile)) +
-  geom_hline(yintercept=0) +
-  geom_line() +
-  geom_pointrange(aes(ymin=wealth_index_score-se_wealth_index_score, ymax=wealth_index_score+se_wealth_index_score)) +
-  facet_wrap(~country_name)+
-  theme_minimal() +
-  labs(x="", y="Wealth Index")
-
-ggplot(wealth_and_access[survey_count>2],
-       aes(x=year, y=wealth_index_score, color=wealth_quintile)) +
-  geom_hline(yintercept=0) +
-  geom_line() +
-  geom_pointrange(aes(ymin=wealth_index_score-se_wealth_index_score, ymax=wealth_index_score+se_wealth_index_score)) +
-  facet_wrap(~country_name)+
-  theme_minimal() +
-  labs(x="", y="Wealth Index")
 
 # compare wealth index to access--poorly informative
 ggplot(wealth_and_access, aes(x=wealth_index_score, y=access)) +
@@ -383,11 +292,6 @@ all_gaps <- merge(wealth_and_access[access_rank_factor %in% c("Lowest Access", "
 all_gaps[, access_rank_factor:= paste(access_rank_factor, " Wealth Quintile")]
 all_gaps <- dcast.data.table(all_gaps, country_name + dhs_survey_id +survey_label + year + `Lowest Access` + `Highest Access` + access_gap + Poorest + Richest + wealth_gap ~ access_rank_factor, 
                              value.var = "wealth_quintile" )
-
-ggplot(all_gaps) +
-  geom_linerange(aes(x=wealth_gap, ymin=`Lowest Access`, ymax=`Highest Access`)) +
-  facet_grid(`Highest Access  Wealth Quintile` ~ `Lowest Access  Wealth Quintile`) +
-  theme_minimal()
 
 ggplot(all_gaps, aes(x=`Lowest Access`, y=access_gap, color=year)) +
   geom_point(size=2) +
@@ -450,10 +354,8 @@ ggplot(all_gaps, aes(x=year, y=access_gap)) +
 # look at access gap vs national access and prevalence 
 
 all_gaps <- merge(all_gaps, national_access, by="dhs_survey_id", all.x=T)
-all_gaps <- merge(all_gaps, pfpr_data[, list(country_name=Name,
-                                 year=Year,
-                                 pfpr=Value/100)],
-      by=c("country_name", "year"),
+all_gaps <- merge(all_gaps, pfpr_data,
+      by=c("country_name", "name", "year"),
       all.x=T)
 
 ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
