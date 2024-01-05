@@ -356,5 +356,18 @@ all_gaps <- merge(all_gaps, pfpr_data,
       all.x=T)
 
 ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
-  geom_point()
+  geom_point(aes(color=`Highest Access  Wealth Quintile`)) +
+  facet_grid(~`Highest Access  Wealth Quintile`) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x="PfPR", y="Access Gap")
+
+ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
+  geom_point(aes(color=`Highest Access  Wealth Quintile`)) +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile\nwith Highest Access") +
+  facet_geo(~name, grid = ssa_grid, label="name") +
+  #theme_minimal() +
+  labs(x="PfPR", y="Access Gap")
+
 
