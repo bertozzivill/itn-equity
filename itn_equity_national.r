@@ -159,8 +159,13 @@ access_and_pfpr <- merge(access_and_pfpr, national_access,
                          by= c("dhs_survey_id"), all.x=T)
 
 ggplot(access_and_pfpr, aes(x=pfpr, y=national_access)) +
-  geom_point(aes(color=year)) +
-  facet_geo(~name, grid = ssa_grid, label="name")
+  geom_point()
+
+ggplot(access_and_pfpr, aes(x=year, y=pfpr)) +
+  geom_point(aes(color=national_access)) +
+  scale_color_distiller(palette = "YlGn", direction=1) +
+  facet_geo(~name, grid = ssa_grid, label="name") +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
 
 
 ggplot(access_and_pfpr,
@@ -356,6 +361,12 @@ all_gaps <- merge(all_gaps, pfpr_data,
       all.x=T)
 
 ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
+  geom_point() +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x="PfPR", y="Access Gap")
+
+ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
   geom_point(aes(color=`Highest Access  Wealth Quintile`)) +
   facet_grid(~`Highest Access  Wealth Quintile`) +
   theme_minimal() +
@@ -368,6 +379,7 @@ ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
                      name="Wealth Quintile\nwith Highest Access") +
   facet_geo(~name, grid = ssa_grid, label="name") +
   #theme_minimal() +
-  labs(x="PfPR", y="Access Gap")
+  labs(x="PfPR", y="Access Gap",
+       title="PfPR vs Access Gap, Mapped")
 
 

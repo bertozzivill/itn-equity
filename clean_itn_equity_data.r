@@ -169,7 +169,7 @@ itn_data[,(metric_vals):=lapply(.SD, factor, labels=wealth_quintile_levels),
 
 
 # save this dataset to explore in another script.
-write.csv(itn_data, file=file.path(parent_dir, "itn_equity_cleaned.csv"), row.names=F)
+write.csv(itn_data, file=file.path(parent_dir, "../cleaned_input_data/itn_equity_cleaned.csv"), row.names=F)
 
 
 
