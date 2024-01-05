@@ -141,7 +141,6 @@ ggplot(access_by_quintile_hh,
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
   geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
-  # facet_wrap(~country_name)+
   facet_geo(~name, grid = ssa_grid, label="name") +
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
@@ -330,7 +329,6 @@ ggplot(all_gaps, aes(x=year,
   geom_point(aes(y=`Highest Access`, color=`Highest Access  Wealth Quintile`), size=2)+
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
-  #facet_wrap(~country_name) +
   facet_geo(~name, grid = ssa_grid, label="name") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
@@ -341,7 +339,6 @@ ggplot(all_gaps, aes(x=year,
 ggplot(all_gaps, aes(x=year, y=access_gap)) +
   geom_line() + 
   geom_point(aes(color=`Highest Access  Wealth Quintile`), size=2) +
-  # facet_wrap(~country_name) +
   facet_geo(~name, grid = ssa_grid, label="name") +
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile\nwith Highest Access") +
