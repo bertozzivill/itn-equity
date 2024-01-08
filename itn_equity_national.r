@@ -22,7 +22,7 @@ rm(list=ls())
 
 # filepaths
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/"
-input_data_fname <- file.path(parent_dir, "primary_data/itn_equity_cleaned.csv")
+input_data_fname <- file.path(parent_dir, "cleaned_input_data/itn_equity_cleaned.csv")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
 
@@ -382,4 +382,54 @@ ggplot(all_gaps, aes(x=pfpr, y=access_gap)) +
   labs(x="PfPR", y="Access Gap",
        title="PfPR vs Access Gap, Mapped")
 
+##### How does the access gap relate to the timing of mass campaigns?
+net_dists <- fread(file.path(parent_dir, "cleaned_input_data/itn_dists_cleaned.csv"))
+
+# keep only the countries we need, and merge on the proper country name
+net_dists <- merge(unique(country_survey_map[, list(country_name, iso3)]),
+                   net_dists[, list(iso3, year, nets_distributed,mass_campaign)],
+                   by="iso3",
+                   all.x=T)
+net_dists[, name:=country_name]
+
+net_dists[, counter:= cumsum(mass_campaign==T), by=iso3]
+net_dists[, yrs_since_campaign:= ifelse(mass_campaign == F & counter>0, seq_len(.N)-1, NA_integer_), 
+          by=list(iso3, counter)]
+net_dists[mass_campaign==T, yrs_since_campaign:=0]
+
+ggplot(net_dists, aes(x=year, y=nets_distributed)) +
+  geom_line() +
+  geom_point(aes(color=mass_campaign)) +
+  facet_wrap(~iso3, scales="free_y") +
+  theme_minimal()
+
+
+
+ggplot(net_dists, aes(x=year, y=nets_distributed)) +
+  geom_line() +
+  geom_point(aes(color=factor(yrs_since_campaign), shape=mass_campaign)) +
+  # facet_geo(~name, grid = ssa_grid, label="name", scales="free_y") 
+  facet_wrap(~iso3, scales="free_y") +
+  theme_minimal()
+
+# creates nulls for Eswatini 2006, Namibia 2006, ST&P 2008
+all_gaps <- merge(all_gaps, net_dists[, list(country_name, 
+                                         year, 
+                                         nets_distributed, 
+                                         mass_campaign, 
+                                         yrs_since_campaign)],
+              by=c("country_name", "year"), all.x=T) 
+
+
+ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, fill=factor(yrs_since_campaign))) +
+  geom_violin(alpha=0.5) +
+  geom_boxplot(width=0.1) +
+  geom_point() +
+  theme_minimal()
+
+ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, color=`Highest Access  Wealth Quintile`)) +
+  geom_point() +
+  facet_grid(.~`Highest Access  Wealth Quintile`) +
+  # facet_geo(~name, grid = ssa_grid, label="name", scales="free_y") 
+  theme_minimal()
 
