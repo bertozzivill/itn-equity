@@ -68,7 +68,7 @@ ggplot(pfpr_data, aes(x=year, y=pfpr)) +
 # use this to add iso3 to the country map
 country_survey_map <- merge(country_survey_map, unique(pfpr_data[, list(country_name, iso3)]), all.x=T)
 
-##### Find national-level int access for each survey
+##### Find national-level itn access for each survey
 national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
   
   these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
@@ -428,8 +428,23 @@ ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, fill=factor(yrs_since_c
   theme_minimal()
 
 ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, color=`Highest Access  Wealth Quintile`)) +
+  # geom_violin(aes(group=yrs_since_campaign), alpha=0.5) +
+  geom_boxplot(aes(group=yrs_since_campaign)) +
   geom_point() +
   facet_grid(.~`Highest Access  Wealth Quintile`) +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile\nwith Highest Access") +
   # facet_geo(~name, grid = ssa_grid, label="name", scales="free_y") 
   theme_minimal()
+
+ggplot(all_gaps, aes(x=year, y=access_gap)) +
+  geom_line() + 
+  geom_point(aes(color=factor(yrs_since_campaign)), size=2) +
+  facet_geo(~name, grid = ssa_grid, label="name") +
+  # scale_color_manual(values = rev(pnw_palette("Bay",5)),
+  #                    name="Wealth Quintile\nwith Highest Access") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(y="Access",
+       title="Access Gap over Country and Time")
 
