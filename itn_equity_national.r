@@ -140,14 +140,13 @@ access_by_quintile_hh[, name:=country_name]
 ggplot(access_by_quintile_hh,
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
-  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  geom_point() +
   facet_geo(~name, grid = ssa_grid, label="name") +
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
-  labs(x="", y="ITN Access",
-       title="ITN Access by Country and Time")
+  labs(x="", y="ITN Access")
 
 # merge pfpr and national access onto this
 access_and_pfpr <- merge(access_by_quintile_hh,
@@ -222,6 +221,9 @@ wealth_by_quintile[, survey_count:=NULL]
 
 wealth_and_access <- merge(access_by_quintile_hh, wealth_by_quintile, all.x=T)
 
+
+
+# explore wealth quintile specifically
 ggplot(wealth_and_access[survey_count==1],
        aes(x=wealth_quintile, y=reorder(survey_label, wealth_index_score), fill=wealth_index_score)) +
   geom_tile() +
@@ -240,6 +242,28 @@ ggplot(wealth_and_access,
   theme_minimal() +
   labs(x="", y="Wealth Index")
 
+
+# what does wealth vs access look like overall?
+ggplot(wealth_and_access, aes(x=wealth_quintile, y=access, fill=wealth_quintile)) +
+  geom_point(alpha=0.5) +
+  geom_violin( alpha=0.5) +
+  geom_boxplot(width=0.2) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  theme_minimal() +
+  labs(x="",
+       y="ITN Access")
+
+ggplot(wealth_and_access, aes(x=access_rank_factor, fill=wealth_quintile)) +
+  geom_bar()+
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                              name="Wealth Quintile") +
+  geom_text(aes(label=after_stat(count)), 
+            stat='count', 
+            position=position_stack(vjust=0.5))+
+  theme_minimal() +
+  labs(x="",
+       y="Count")
 
 # compare wealth index to access--poorly informative
 ggplot(wealth_and_access, aes(x=wealth_index_score, y=access)) +
@@ -260,6 +284,8 @@ ggplot(count_surveys_by_group, aes(x=wealth_quintile, y=access_rank_factor)) +
   theme_minimal() +
   labs(x="",
        y="")
+
+
 
 
 # How big is the discrepancy between the highest and lowest wealth quintiles?
@@ -349,8 +375,9 @@ ggplot(all_gaps, aes(x=year, y=access_gap)) +
                      name="Wealth Quintile\nwith Highest Access") +
   theme_minimal()+
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
-  labs(y="Access",
-       title="Access Gap over Country and Time")
+  labs(x="",
+       y="Access Gap",
+       title="")
 
 
 # look at access gap vs national access and prevalence 
@@ -421,13 +448,18 @@ all_gaps <- merge(all_gaps, net_dists[, list(country_name,
               by=c("country_name", "year"), all.x=T) 
 
 
-ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, fill=factor(yrs_since_campaign))) +
+all_gaps[is.na(yrs_since_campaign), yrs_since_campaign:=-1]
+
+ggplot(all_gaps, aes(x=factor(yrs_since_campaign), y=access_gap, fill=factor(yrs_since_campaign))) +
+  geom_point(alpha=0.5) +
   geom_violin(alpha=0.5) +
   geom_boxplot(width=0.1) +
-  geom_point() +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x="Years Since Last Campaign",
+       y="Access Gap")
 
-ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, color=`Highest Access  Wealth Quintile`)) +
+ggplot(all_gaps, aes(x=factor(yrs_since_campaign), y=access_gap, color=`Highest Access  Wealth Quintile`)) +
   # geom_violin(aes(group=yrs_since_campaign), alpha=0.5) +
   geom_boxplot(aes(group=yrs_since_campaign)) +
   geom_point() +
@@ -435,7 +467,9 @@ ggplot(all_gaps, aes(x=yrs_since_campaign, y=access_gap, color=`Highest Access  
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile\nwith Highest Access") +
   # facet_geo(~name, grid = ssa_grid, label="name", scales="free_y") 
-  theme_minimal()
+  theme_minimal() +
+  labs(x="Years Since Last Campaign",
+       y="Access Gap")
 
 ggplot(all_gaps, aes(x=year, y=access_gap)) +
   geom_line() + 
