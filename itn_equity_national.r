@@ -426,6 +426,12 @@ net_dists[mass_campaign==T, yrs_since_campaign:=0]
 
 ggplot(net_dists, aes(x=year, y=nets_distributed)) +
   geom_line() +
+  geom_point() +
+  facet_wrap(~iso3, scales="free_y") +
+  theme_minimal()
+
+ggplot(net_dists, aes(x=year, y=nets_distributed)) +
+  geom_line() +
   geom_point(aes(color=mass_campaign)) +
   facet_wrap(~iso3, scales="free_y") +
   theme_minimal()
