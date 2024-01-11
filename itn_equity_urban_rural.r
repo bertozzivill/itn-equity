@@ -30,7 +30,7 @@ source(function_fname)
 itn_data <- fread(input_data_fname)
 country_survey_map <- unique(itn_data[, list(dhs_survey_id, country_name)])
 
-unique_surveys <- unique(itn_data$dhs_survey_id)
+
 weight_vals <- c("hh_sample_wt", "hh_sample_wt_times_hh")
 wealth_quintile_levels <- c("Poorest",
                             "Poorer",
@@ -42,84 +42,63 @@ wealth_quintile_levels <- c("Poorest",
 to_convert_cols <- names(itn_data)[names(itn_data) %like% "wealth_quintile"]
 itn_data[, c(to_convert_cols) := lapply(.SD, factor, levels=wealth_quintile_levels), .SDcols = to_convert_cols]
 
-# load national-level pfpr data
-pfpr_data <- fread(file.path(parent_dir, "primary_data/National_Unit-data.csv"))
-pfpr_data[ISO3=="CIV", Name:="Cote d'Ivoire"]
-pfpr_data[ISO3=="COD", Name:="Congo Democratic Republic"]
-pfpr_data[ISO3=="STP", Name:="Sao Tome and Principe"]
-pfpr_data[ISO3=="SWZ", Name:="Eswatini"]
-pfpr_data <- pfpr_data[Metric=="Infection Prevalence" & Name %in% country_survey_map$country_name,
-                       list(country_name=Name,
-                            iso3=ISO3,
-                            name=Name,
-                            year=Year,
-                            pfpr=Value/100)]
-
-
-
 # load geofacet 
 ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
-ggplot(pfpr_data, aes(x=year, y=pfpr)) +
-  geom_line() +
-  geom_point() +
-  facet_geo(~name, grid = ssa_grid, label="name")
+# the urban/rural label is absent in some surveys--- calculate what percentage of each
+urban_rural_missing_surveys <- unique(itn_data[cluster_urban_rural==""]$dhs_survey_id) 
+urban_rural_missing <- itn_data[dhs_survey_id %in% urban_rural_missing_surveys]
+table(urban_rural_missing$dhs_survey_id)
 
-# use this to add iso3 to the country map
-country_survey_map <- merge(country_survey_map, unique(pfpr_data[, list(country_name, iso3)]), all.x=T)
+#oh, it's in all of these surveys... drop em
+print("dropping the following surveys with missing urban/rural labels")
+print(urban_rural_missing_surveys)
+itn_data <- itn_data[!dhs_survey_id %in% urban_rural_missing_surveys]
+itn_data[, urban_rural:= ifelse(cluster_urban_rural=="U", "Urban", "Rural")]
 
-##### Find national-level itn access for each survey
-national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
+rm(urban_rural_missing, urban_rural_missing_surveys)
+
+unique_surveys <- unique(itn_data$dhs_survey_id)
+
+
+##### Find urban/rural-level itn access for each survey
+urban_rural_access <- rbindlist(lapply(unique_surveys, function(this_survey){
   
   these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
                                   ids = "clusterid",
                                   weight_vals = "hh_sample_wt",
-                                  metric_vals = "access"
+                                  metric_vals = "access",
+                                  by_vals = "urban_rural"
   )
   these_means[, dhs_survey_id:=this_survey]
 }))
-# I have no idea why, but converting a svystat object to a data 
-# table renames the "SE" column to "access"... correct this 
-national_access <- national_access[, list(dhs_survey_id, 
-                                          national_access=mean,
-                                          national_access_se=access)]
+
+urban_rural_access <-merge(urban_rural_access, country_survey_map, all.x=T)
+urban_rural_access[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id))]
+urban_rural_access[, name:=country_name]
+
+ggplot(urban_rural_access,
+       aes(x=year, y=access, color=urban_rural)) +
+  geom_line() +
+  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  facet_geo(~name, grid = ssa_grid, label="name") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="", y="ITN Access",
+       title="ITN Access by Country and Time")
 
 
+##### What does ITN Access by wealth quintile and urbanicity look like?
 
-##### What does median household wealth by quintile look like under the different metrics?
-
-wealth_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
-  
-  these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
-                                  ids = "clusterid",
-                                  weight_vals = weight_vals,
-                                  metric_vals = "wealth_index_score",
-                                  by_vals = c("wealth_quintile_by_population",
-                                              "wealth_quintile_by_household")
-  )
-  setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
-  these_means[, dhs_survey_id:=this_survey]
-  
-}))
-
-# remove inappropriate weighting types 
-wealth_by_quintile <- wealth_by_quintile[(metric=="wealth_quintile_by_household" & weighting_type=="hh_sample_wt") | 
-                                           (metric!="wealth_quintile_by_household" & weighting_type!="hh_sample_wt")]
-
-wealth_by_quintile <- merge(wealth_by_quintile, country_survey_map, all.x = T)
-wealth_by_quintile[, survey_count:= seq_len(.N), by=.(metric, wealth_quintile, country_name)]
-
-
-##### What does ITN Access by wealth quintile look like?
 access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
   
   these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
                                   ids = "clusterid",
                                   weight_vals = weight_vals,
                                   metric_vals = "access",
-                                  by_vals = c("wealth_quintile_by_population",
-                                              "wealth_quintile_by_household",
-                                              "wealth_quintile_dhs")
+                                  by_vals = c("~wealth_quintile_by_population+urban_rural",
+                                              "~wealth_quintile_by_household+urban_rural",
+                                              "~wealth_quintile_dhs+urban_rural")
   )
   setnames(these_means, "wealth_quintile_by_population", "wealth_quintile")
   these_means[, dhs_survey_id:=this_survey]
@@ -127,12 +106,35 @@ access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
 }))
 
 # remove inappropriate weighting types 
-access_by_quintile <- access_by_quintile[(metric=="wealth_quintile_by_household" & weighting_type=="hh_sample_wt") | 
-                                           (metric!="wealth_quintile_by_household" & weighting_type!="hh_sample_wt")]
+access_by_quintile[, metric:=gsub("~", "", metric)]
+access_by_quintile[, metric:=gsub("\\+urban_rural", "", metric)]
+
+access_by_quintile <- access_by_quintile[((metric== "wealth_quintile_by_household") & (weighting_type=="hh_sample_wt")) | 
+                                           ((metric != "wealth_quintile_by_household") & (weighting_type!="hh_sample_wt"))]
 
 access_by_quintile <-merge(access_by_quintile, country_survey_map, all.x=T)
 access_by_quintile[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id))]
 
+# check weighting types
+access_by_quintile_wide <- dcast.data.table(access_by_quintile, 
+                                            dhs_survey_id + wealth_quintile + urban_rural ~ metric, 
+                                            value.var="access")
+
+ggplot(access_by_quintile_wide, aes(x=wealth_quintile_by_household, 
+                                    y=wealth_quintile_by_population)) +
+  geom_abline() +
+  geom_point()
+
+ggplot(access_by_quintile_wide, aes(x=wealth_quintile_by_household, 
+                                    y=wealth_quintile_dhs)) +
+  geom_abline() +
+  geom_point()
+
+ggplot(access_by_quintile_wide, aes(x=wealth_quintile_by_population, 
+                                    y=wealth_quintile_dhs)) +
+  geom_abline() +
+  geom_point()
+
 # choose to focus on the houshold-level metric for comparability
-access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
+access_by_quintile_hh <- access_by_quintile[metric %like%  "wealth_quintile_by_household"]
 access_by_quintile_hh[, name:=country_name]
