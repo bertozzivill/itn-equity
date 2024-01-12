@@ -115,26 +115,70 @@ access_by_quintile <- access_by_quintile[((metric== "wealth_quintile_by_househol
 access_by_quintile <-merge(access_by_quintile, country_survey_map, all.x=T)
 access_by_quintile[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id))]
 
-# check weighting types
-access_by_quintile_wide <- dcast.data.table(access_by_quintile, 
-                                            dhs_survey_id + wealth_quintile + urban_rural ~ metric, 
-                                            value.var="access")
-
-ggplot(access_by_quintile_wide, aes(x=wealth_quintile_by_household, 
-                                    y=wealth_quintile_by_population)) +
-  geom_abline() +
-  geom_point()
-
-ggplot(access_by_quintile_wide, aes(x=wealth_quintile_by_household, 
-                                    y=wealth_quintile_dhs)) +
-  geom_abline() +
-  geom_point()
-
-ggplot(access_by_quintile_wide, aes(x=wealth_quintile_by_population, 
-                                    y=wealth_quintile_dhs)) +
-  geom_abline() +
-  geom_point()
 
 # choose to focus on the houshold-level metric for comparability
-access_by_quintile_hh <- access_by_quintile[metric %like%  "wealth_quintile_by_household"]
+access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
 access_by_quintile_hh[, name:=country_name]
+
+example_country <- "Senegal"
+ggplot(access_by_quintile_hh[urban_rural=="Rural"],
+       aes(x=year, y=access, color=wealth_quintile)) +
+  geom_line() +
+  geom_point() +
+  facet_geo(~name, grid = ssa_grid, label="name") + 
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  theme_minimal()
+
+# Add ranking of quintiles
+access_by_quintile_hh[ , access_rank := order(order(access, decreasing = FALSE)), 
+                       by=.(dhs_survey_id, urban_rural) ]
+access_by_quintile_hh[ , access_rank_factor := factor(access_rank,
+                                                      labels=c("Lowest Access", 
+                                                               "Lower Access", 
+                                                               "Middle Access", 
+                                                               "Higher Access",
+                                                               "Highest Access"))]
+ggplot(access_by_quintile_hh, aes(x=wealth_quintile, y=access, fill=wealth_quintile)) +
+  geom_point(alpha=0.5) +
+  geom_violin( alpha=0.5) +
+  geom_boxplot(width=0.2) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_grid(~urban_rural) +
+  theme_minimal() +
+  labs(x="",
+       y="ITN Access")
+
+# note that the "Urban" plot doesn't have all the bars b/c some surveys
+# literally don't have Poorest/Poorer quintiles in cities
+# (zimbabwe, malawi, guinea, cameroon, cote d'ivoire)
+ggplot(access_by_quintile_hh, aes(x=access_rank_factor, fill=wealth_quintile)) +
+  geom_bar()+
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  geom_text(aes(label=after_stat(count)), 
+            stat='count', 
+            position=position_stack(vjust=0.5))+
+  facet_grid(~urban_rural) +
+  theme_minimal() +
+  labs(x="",
+       y="Count")
+
+
+# Now access gap
+access_gap <- dcast.data.table(
+  access_by_quintile_hh[access_rank_factor %in% c("Lowest Access", "Highest Access")],
+  country_name + name + dhs_survey_id + urban_rural + year  ~ access_rank_factor, value.var = "access"
+)
+access_gap[, access_gap:=`Highest Access` - `Lowest Access`]
+
+test <- merge(access_by_quintile_hh[access_rank_factor %in% c("Lowest Access", "Highest Access"),
+                        list(dhs_survey_id, 
+                             urban_rural,
+                             wealth_quintile,
+                             access_rank_factor)],
+              access_gap, 
+      by=c("dhs_survey_id", "urban_rural"),
+      all.x=T)
+
