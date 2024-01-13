@@ -1,11 +1,11 @@
 
 
 ###############################################################################################################
-## itn_equity_national.r
+## itn_equity_urban_rural.r
 ## Amelia Bertozzi-Villa
-## December 2023
+## January 2024
 ## 
-## Aggregate surveys to the national level and explore the relationship between 
+## Aggregate surveys to the urban-rural level and explore the relationship between 
 ## wealth quintile and ITN access
 ##############################################################################################################
 

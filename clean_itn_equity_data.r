@@ -15,7 +15,7 @@ rm(list=ls())
 
 # filepaths
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/primary_data"
-raw_data_fname <- file.path(parent_dir, "itn_with_housing-1-2-0.csv")
+raw_data_fname <- file.path(parent_dir, "itn_with_housing-2-0-1.csv")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
 
@@ -34,17 +34,25 @@ itn_data <- data_raw[, list(surveyid,
                             hhid,
                             latitude,
                             longitude,
-                            cluster_urban_rural,
+                            urban_rural=ifelse(cluster_urban_rural=="", NA,
+                                               ifelse(cluster_urban_rural=="U", 
+                                                      "Urban", "Rural")),
                             interview_month,
                             interview_year,
+                            year=as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_id)),
                             survey_year_label,
                             hh_sample_wt,
                             hh_size,
                             n_dejure_pop,
                             n_defacto_pop,
+                            n_pop_u5,
                             n_slept_under_itn,
                             n_itn,
                             itn_theoretical_capacity,
+                            examined_micro,
+                            positive_micro,
+                            examined_rdt,
+                            positive_rdt,
                             wealth_quintile_dhs=wealth_index,
                             wealth_index_score)]
 itn_data <- itn_data[order(country_name, dhs_survey_id, clusterid, hhid)]
@@ -168,6 +176,26 @@ metric_vals <- c("wealth_quintile_dhs",
 itn_data[,(metric_vals):=lapply(.SD, factor, labels=wealth_quintile_levels),
          .SDcols=metric_vals]
 
+# calculate prevalence
+itn_data[,prev_micro:= positive_micro/examined_micro]
+itn_data[, prev_rdt:=positive_rdt/examined_rdt]
+
+
+#quick exploration of pfpr
+pfpr_subset <- itn_data[!is.na(examined_micro) | !is.na(examined_rdt)]
+
+# is there a concern that more kids were examined than there were kids in the house?
+pfpr_subset[examined_micro>n_pop_u5]
+
+# what's the difference between an "examined_*" of 0 and an NA? 
+# maybe a zero is an attempted test but no consent? should I drop those?
+
+pfpr_subset[, micro_tested:= examined_micro>0]
+pfpr_subset[, rdt_tested:= examined_rdt>0]
+
+# surprised that so many households got both rdt tests and microscopy tests?
+table(pfpr_subset$micro_tested, pfpr_subset$rdt_tested)
+pfpr_subset[micro_tested==T & rdt_tested==T & micro_tested!=rdt_tested]
 
 # save this dataset to explore in another script.
 write.csv(itn_data, file=file.path(parent_dir, "../cleaned_input_data/itn_equity_cleaned.csv"), row.names=F)
