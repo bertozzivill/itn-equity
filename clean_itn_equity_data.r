@@ -185,15 +185,19 @@ itn_data[, prev_rdt:=positive_rdt/examined_rdt]
 pfpr_subset <- itn_data[!is.na(examined_micro) | !is.na(examined_rdt)]
 
 # is there a concern that more kids were examined than there were kids in the house?
+# is n_pop_u5 de facto or de jure?
+# in some places, kids over 5 are tested, via camilo
 pfpr_subset[examined_micro>n_pop_u5]
 
 # what's the difference between an "examined_*" of 0 and an NA? 
 # maybe a zero is an attempted test but no consent? should I drop those?
+# from camilo: NA means household was not selected, 0 means no people were examined for whatever reason
 
 pfpr_subset[, micro_tested:= examined_micro>0]
 pfpr_subset[, rdt_tested:= examined_rdt>0]
 
 # surprised that so many households got both rdt tests and microscopy tests?
+# from camilo: yup, that's true! 
 table(pfpr_subset$micro_tested, pfpr_subset$rdt_tested)
 pfpr_subset[micro_tested==T & rdt_tested==T & micro_tested!=rdt_tested]
 
