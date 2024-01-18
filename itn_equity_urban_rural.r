@@ -45,8 +45,10 @@ itn_data[, c(to_convert_cols) := lapply(.SD, factor, levels=wealth_quintile_leve
 # load geofacet 
 ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
+example_countries <- c("Senegal", "Rwanda", "Nigeria")
+
 # the urban/rural label is absent in some surveys--- calculate what percentage of each
-urban_rural_missing_surveys <- unique(itn_data[cluster_urban_rural==""]$dhs_survey_id) 
+urban_rural_missing_surveys <- unique(itn_data[is.na(urban_rural)]$dhs_survey_id) 
 urban_rural_missing <- itn_data[dhs_survey_id %in% urban_rural_missing_surveys]
 table(urban_rural_missing$dhs_survey_id)
 
@@ -54,11 +56,85 @@ table(urban_rural_missing$dhs_survey_id)
 print("dropping the following surveys with missing urban/rural labels")
 print(urban_rural_missing_surveys)
 itn_data <- itn_data[!dhs_survey_id %in% urban_rural_missing_surveys]
-itn_data[, urban_rural:= ifelse(cluster_urban_rural=="U", "Urban", "Rural")]
+itn_data[, name:=country_name]
 
 rm(urban_rural_missing, urban_rural_missing_surveys)
 
 unique_surveys <- unique(itn_data$dhs_survey_id)
+
+# what does wealth index look like in urban vs rural settings?
+ggplot(itn_data, aes(x=urban_rural, y=wealth_index_score, color=urban_rural, fill=urban_rural)) +
+  geom_boxplot(alpha=0.5)
+
+ggplot(itn_data, aes(x=urban_rural, y=wealth_index_score, color=urban_rural, fill=urban_rural)) +
+  geom_boxplot(alpha=0.5) +
+  facet_geo(~name, grid = ssa_grid, label="name", scales="free") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# find the proportion of each quintile in urban/rural (appropriately weighted)
+
+quint_props <- itn_data[, .(n=sum(hh_sample_wt),
+                            unweighted_n=.N),
+         .(dhs_survey_id,
+           country_name, 
+           name, 
+           urban_rural, 
+           year,
+           wealth_quintile_by_household)][,
+                                          prop_by_quint := n/sum(n), 
+                                          .(dhs_survey_id,
+                                            country_name, 
+                                            name, 
+                                            wealth_quintile_by_household)]
+
+quint_props[, prop_by_urban_rural:= n/sum(n),
+                                              .(dhs_survey_id,
+                                              country_name, 
+                                              name, 
+                                              urban_rural)]
+
+ggplot(quint_props,
+       aes(x=wealth_quintile_by_household,
+           y=prop_by_quint,
+           fill=urban_rural)) +
+  geom_bar(stat="identity") +
+  facet_wrap(~dhs_survey_id) +
+  #facet_geo(~name, grid = ssa_grid, label="name", scales="free") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Proportion")
+
+ggplot(quint_props,
+       aes(x=urban_rural,
+           y=prop_by_urban_rural,
+           fill=wealth_quintile_by_household)) +
+  geom_bar(stat="identity") +
+  facet_wrap(~dhs_survey_id) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  #facet_geo(~name, grid = ssa_grid, label="name", scales="free") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Proportion")
+
+
+ggplot(quint_props[name %in% example_countries],
+       aes(x=year,
+           y=prop_by_urban_rural,
+           color=wealth_quintile_by_household)) +
+  geom_line() +
+  geom_point() +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_grid(name~urban_rural) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Proportion")
+
 
 
 ##### Find urban/rural-level itn access for each survey
@@ -120,8 +196,18 @@ access_by_quintile[, year:= as.integer(gsub(".*([0-9]{4}).*", "\\1", dhs_survey_
 access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_household"]
 access_by_quintile_hh[, name:=country_name]
 
-example_country <- "Senegal"
-ggplot(access_by_quintile_hh[urban_rural=="Rural"],
+
+ggplot(access_by_quintile_hh[name %in% example_countries],
+       aes(x=year, y=access, color=wealth_quintile)) +
+  geom_line() +
+  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
+  facet_grid(name~urban_rural) + 
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  theme_minimal()
+
+
+ggplot(access_by_quintile_hh[urban_rural=="Urban"],
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
   geom_point() +
