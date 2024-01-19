@@ -12,7 +12,7 @@ library(ggplot2)
 rm(list = ls())
 
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/primary_data"
-raw_data_fname <- file.path(parent_dir, "itn_nets-1-0-0.csv")
+raw_data_fname <- file.path(parent_dir, "itn_nets-1-0-1.csv")
 
 prov_raw <- fread(raw_data_fname)
 setnames(prov_raw, "householdid", "hhid")
@@ -30,8 +30,10 @@ length(intersect(hh_svyids, prov_svyids)) == length(hh_svyids)
 prop.table(table(hh_data$surveyid, hh_data$hh_has_entry_in_net_tbl), margin=1)
 # all of them, except for 338!
 
+
 # go ahead and subset the provenance data down to just these surveys
 prov_raw <- prov_raw[surveyid %in% hh_svyids]
+
 
 # there are 11 cases with an NA clusterid... can we rediscover the clusterid
 # using the hh data?
@@ -131,12 +133,19 @@ check_counts <- merge(prov_raw
                                        n_itn)],
                           all=T)
 
+# for now, drop the places with na n_itn (not present in hh surveys)
+check_counts <- check_counts[!is.na(n_itn)]
+
 # make sure all netid NAs are zeros
 unique(check_counts[is.na(netid)]$n_itn)
+
+# ok, then drop those as well for now
+check_counts <- check_counts[!is.na(netid)]
 
 # make sure all n_itn==0 has a netid of NA
 # oh, these are untreated nets
 untreated_nets <- check_counts[n_itn==0 & !is.na(netid)]
+unique(untreated_nets$itn)
 
 # how many in each survey? quite a few! 
 prop.table(table(prov_raw$surveyid, prov_raw$itn), margin=1)*100
@@ -158,17 +167,232 @@ count_itns[n_itn!=prov_net_count]
 #######################################################
 # ok, now that we know this... for how many of these nets do we
 # *actually* have provenance data?
-# make a guess here until we get docs from camilo
 
-prov_raw[, source_1_is_missing:= 
-           (source_1_reclass %in% c("not applicable", "missing"))]
-prop.table(table(prov_raw$surveyid, prov_raw$source_1_is_missing), margin=1) * 100
+prov_raw[, source_1_check_missingness:= 
+           (ifelse(source_1_reclass %in% c("", "not applicable", "missing"),
+                   source_1_reclass, 
+                   "present"))]
+prov_raw[source_1_check_missingness=="", source_1_check_missingness:="not in survey"]
 
-prov_raw[, source_2_is_missing:= 
-           (source_2_reclass %in% c("do not know", "not applicable", "missing", "other"))]
-prop.table(table(prov_raw$surveyid, prov_raw$source_2_is_missing), margin=1) * 100
+missing_props <- as.data.table(prop.table(table(prov_raw$surveyid,
+                                                prov_raw$source_1_check_missingness), 
+                                          margin=1) * 100)
+names(missing_props) <- c("surveyid", "source_1_type", "prop")
+missing_props[, surveyid:=as.integer(surveyid)]
+missing_props <- merge(unique(hh_data[, list(surveyid, dhs_survey_id, country_name, year)]),
+      missing_props, all=T)
+# ok, there are only three surveys that have any variation in missingness type, 
+# and all three of those are 99% present. 
+missing_props[!prop %in% c(0, 100)]
 
-# hmm, I'll need more info from camilo before I can continue.
+# let's just round everything to an integer value to have one value per survey
+missing_props[, prop:=round(prop)]
+missing_props <- missing_props[prop==100]
+table(missing_props$source_1_type)
 
+# aha, ok, we start to get info about net provenance in 2015
+ggplot(missing_props, aes(x=year, fill=source_1_type)) +
+  geom_bar() +
+  theme_minimal() 
+
+# let's subset down to the 44 surveys that have responses and take a look at the contents
+
+present_surveys <- missing_props[source_1_type=="present"]$surveyid
+
+prov_subset <- prov_raw[surveyid %in% present_surveys]
+
+prop.table(table(prov_subset$surveyid, prov_subset$source_1_reclass), margin=1)*100
+
+prop.table(table(prov_subset$source_1_reclass))*100
+
+# confirm that source 2 is only filled when source 1 is "no"-- whoops, it's not
+unique(prov_subset$source_2_reclass)
+table(prov_subset[source_1_reclass!="no"]$source_2_reclass)
+
+# hmm, let's explore these one by one
+# chw looks like an added detail on top of routine distribution
+prov_subset[source_1_reclass!="no" & source_2_reclass=="community health worker"]
+
+# govt facility similar to chw looks like an added detail on top of routine distribution
+unique(prov_subset[source_1_reclass!="no" & source_2_reclass=="government facility"]$source_1_reclass)
+
+# same with ngo
+prov_subset[source_1_reclass!="no" & source_2_reclass=="ngo"]
+
+# same with pharmacy
+prov_subset[source_1_reclass!="no" & source_2_reclass=="pharmacy"]
+
+# same with religious institution
+prov_subset[source_1_reclass!="no" & source_2_reclass=="religious institution"]
+
+# same with private facility
+unique(prov_subset[source_1_reclass!="no" & source_2_reclass=="private facility"]$source_1_reclass)
+
+# same with school
+unique(prov_subset[source_1_reclass!="no" & source_2_reclass=="school"]$source_1_reclass)
+
+# shop is confusing, give source 1 priority
+prov_subset[source_1_reclass!="no" & source_2_reclass=="shop"]
+
+# family & friends is confusing, but only 3 nets-- go w/ source 1
+prov_subset[source_1_reclass!="no" & source_2_reclass=="family or friends"]
+
+# don't know is pretty straightforward & rare
+prov_subset[source_1_reclass!="no" & source_2_reclass=="do not know"]
+
+# think we can safely ignore "other"
+prov_subset[source_1_reclass!="no" & source_2_reclass=="other"]
+
+#### ok, we can always ignore source 2 when source 1 is not "no".
+# when source 1 *is* "no", how do we decide when someone paid for it?
+table(prov_subset[source_1_reclass=="no"]$source_2_reclass)
+
+# clearly unpaid: chw, distribution campaign, ngo, school, community association,
+#                 govt facility, 
+# clearly paid: shop
+# unclear: family/friends, pharmacy, private facility, religious institution
+# null/undefined: do not know, missing, other
+
+# I'm going to put family/friends and religious institution (0.5% of total) into "free", and 
+# pharmacy and private facility (1% of total) into "paid"
+
+### construct a new variable that combines both of these variables since there's overlap
+source_1_vals <- unique(prov_subset$source_1_reclass)
+source_2_vals <- unique(prov_subset$source_2_reclass)
+intersect(source_1_vals, source_2_vals)
+setdiff(source_1_vals, source_2_vals)
+setdiff(source_2_vals, source_1_vals)
+
+# make sure that distribution campaigns have the same value in both
+prov_subset[source_2_reclass=="distribution campaign", source_2_reclass:="campaign"]
+
+prov_subset[, joint_source:= ifelse(source_1_reclass=="no", 
+                                    source_2_reclass,
+                                    source_1_reclass)]
+
+prop.table(table(prov_subset$joint_source))*100
+free_vals <- c("antenatal care",
+               "at birth",
+               "campaign",
+               "community association",
+               "community health worker",
+               "family or friends",
+               "government facility",
+               "immunization visit",
+               "ngo",
+               "religious institution",
+               "school")
+
+paid_vals <- c("pharmacy",
+               "private facility",
+               "shop")
+
+unknown_vals <- c("do not know",
+                  "missing",
+                  "other")
+
+map_vals <- c(rep("free", length(free_vals)),
+              rep("paid", length(paid_vals)),
+              rep("unknown", length(unknown_vals)))
+
+
+joint_vals_map <- data.table(joint_source=c(free_vals,
+                                            paid_vals,
+                                            unknown_vals),
+                             joint_source_recode=map_vals)
+
+prov_subset <- merge(prov_subset, joint_vals_map, all.x=T)
+
+prop.table(table(prov_subset$surveyid, prov_subset$joint_source_recode), margin=1)*100
+
+# randomly distribute the unknown values into free or paid, weighted by
+# the frequency of free/paid in the dataset, by survey
+free_prop <- prop.table(table(prov_subset[joint_source_recode!="unknown"]$surveyid,
+                              prov_subset[joint_source_recode!="unknown"]$joint_source_recode),
+                        margin=1)
+free_prop_dt <- data.table(surveyid=as.integer(rownames(free_prop)),
+                           free_prop=free_prop[,1])
+
+prov_subset <- merge(prov_subset, free_prop_dt, by="surveyid", all.x=T)
+
+set.seed(684)
+prov_subset$rand <- runif(nrow(prov_subset))
+prov_subset[joint_source_recode=="unknown", joint_source_recode_2:= ifelse(rand<free_prop, "free", "paid")]
+prov_subset[joint_source_recode!="unknown", joint_source_recode_2:=joint_source_recode]
+
+new_free_prop <- prop.table(table(prov_subset$surveyid,
+                 prov_subset$joint_source_recode_2),
+           margin=1)
+# good agreement
+round(free_prop, 2)==round(new_free_prop, 2)
+
+
+############ final cleaning and household-level aggregation
+# ok, finally, let's clean this, make plots, and bring up to the household level 
+
+prov_final <- prov_subset[, list(surveyid,
+                                 clusterid,
+                                 hhid, 
+                                 netid,
+                                 itn,
+                                 joint_source,
+                                 paid_type=joint_source_recode_2)]
+
+prov_final <- merge(unique(hh_data[, list(surveyid,
+                                          dhs_survey_id,
+                                          country_name,
+                                          year)],),
+                    prov_final,
+  all.y=T)
+
+prov_final <- prov_final[order(dhs_survey_id)]
+prov_final[, survey_label:= paste(country_name, year)]
+
+
+prov_final_props <- prov_final[, list(type_count=.N),
+                               by=list(dhs_survey_id,
+                                       country_name, 
+                                       year,
+                                       paid_type)][, 
+                                                   type_prop:=type_count/sum(type_count)*100,
+                                                   by=list(dhs_survey_id, 
+                                                           country_name,
+                                                           year)]
+prov_final_props[, survey_label:= paste(country_name, year)]
+
+ggplot(prov_final_props, aes(x=survey_label, y=type_prop, fill=paid_type)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=round(type_prop, 0)), 
+            position=position_stack(vjust=0.5),
+            size=3) +
+  theme_minimal() +
+  scale_fill_manual(values=c("#00BFC4", "#F8766D"), name="Payment Type") + 
+  theme(axis.text.x = element_text(hjust=1, angle=45)) +
+  labs(x="", 
+       y="Percentage")
+
+
+# what proportion of these are untreated?
+untreated_final_props <- prov_final[, list(type_count=.N),
+                               by=list(dhs_survey_id,
+                                       country_name, 
+                                       year,
+                                       itn)][, 
+                                                   itn_prop:=type_count/sum(type_count)*100,
+                                                   by=list(dhs_survey_id, 
+                                                           country_name,
+                                                           year)]
+untreated_final_props[, survey_label:= paste(country_name, year)]
+
+ggplot(untreated_final_props, aes(x=survey_label, y=itn_prop, fill=itn)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=round(itn_prop, 0)),
+            position=position_stack(vjust=0.5),
+            size=3) +
+  theme_minimal() +
+  scale_fill_manual(values=c("#00BFC4", "#F8766D"), name="Is ITN") + 
+  theme(axis.text.x = element_text(hjust=1, angle=45)) +
+  labs(x="", 
+       y="Percentage")
 
 
