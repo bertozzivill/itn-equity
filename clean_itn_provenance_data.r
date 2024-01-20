@@ -8,6 +8,7 @@
 
 library(data.table)
 library(ggplot2)
+library(RColorBrewer)
 
 rm(list = ls())
 
@@ -201,6 +202,9 @@ present_surveys <- missing_props[source_1_type=="present"]$surveyid
 
 prov_subset <- prov_raw[surveyid %in% present_surveys]
 
+# let's *also* subset down to only itns, though we might revise this in the future??
+# prov_subset <- prov_subset[itn=="yes"]
+
 prop.table(table(prov_subset$surveyid, prov_subset$source_1_reclass), margin=1)*100
 
 prop.table(table(prov_subset$source_1_reclass))*100
@@ -366,7 +370,7 @@ ggplot(prov_final_props, aes(x=survey_label, y=type_prop, fill=paid_type)) +
             position=position_stack(vjust=0.5),
             size=3) +
   theme_minimal() +
-  scale_fill_manual(values=c("#00BFC4", "#F8766D"), name="Payment Type") + 
+  scale_fill_manual(values=c("#4dac26", "#d01c8b"), name="Payment Type") + 
   theme(axis.text.x = element_text(hjust=1, angle=45)) +
   labs(x="", 
        y="Percentage")
@@ -390,7 +394,35 @@ ggplot(untreated_final_props, aes(x=survey_label, y=itn_prop, fill=itn)) +
             position=position_stack(vjust=0.5),
             size=3) +
   theme_minimal() +
-  scale_fill_manual(values=c("#00BFC4", "#F8766D"), name="Is ITN") + 
+  scale_fill_manual(values=c( "#F8766D","#00BFC4"), name="Is ITN") + 
+  theme(axis.text.x = element_text(hjust=1, angle=45)) +
+  labs(x="", 
+       y="Percentage")
+
+
+# compare paid vs unpaid itns
+joint_final_props <- prov_final[, list(type_count=.N),
+                                    by=list(dhs_survey_id,
+                                            country_name, 
+                                            year,
+                                            paid_type,
+                                            itn)][, 
+                                                  itn_prop:=type_count/sum(type_count)*100,
+                                                  by=list(dhs_survey_id, 
+                                                          country_name,
+                                                          year)]
+joint_final_props[, survey_label:= paste(country_name, year)]
+joint_final_props[, net_type:= ifelse(itn=="yes", "ITN", "non-ITN")]
+joint_final_props[, full_type := paste(paid_type, net_type)]
+
+pal <- brewer.pal(4, "PiYG")
+ggplot(joint_final_props, aes(x=survey_label, y=itn_prop, fill=full_type)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=round(itn_prop, 0)),
+            position=position_stack(vjust=0.5),
+            size=3) +
+  theme_minimal() +
+  scale_fill_manual(values = c( pal[4], pal[3], pal[1], pal[2]), name="Net Category") + 
   theme(axis.text.x = element_text(hjust=1, angle=45)) +
   labs(x="", 
        y="Percentage")
