@@ -55,8 +55,6 @@ pfpr_data <- pfpr_data[Metric=="Infection Prevalence" & Name %in% country_survey
                             year=Year,
                             pfpr=Value/100)]
 
-
-
 # load geofacet 
 ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
@@ -67,6 +65,63 @@ ggplot(pfpr_data, aes(x=year, y=pfpr)) +
 
 # use this to add iso3 to the country map
 country_survey_map <- merge(country_survey_map, unique(pfpr_data[, list(country_name, iso3)]), all.x=T)
+
+
+##### Remove purchased nets from the itn dataset-- calculate access based *exclusively* 
+##### on freely-provided nets
+
+provenance_data <- fread(file.path(parent_dir, "cleaned_input_data/provenance_by_hh.csv"))
+prov_surveys <- unique(provenance_data$dhs_survey_id)
+
+# keep a record of the original number of itns (free and paid)
+itn_data[, n_itn_total:= n_itn]
+
+# keep an option to remove the surveys without provenance data, even if you don't account for paid nets
+provenance_data_only <- T
+
+if (provenance_data_only){
+  # subset down only to the surveys with provenance data
+  itn_data <- itn_data[dhs_survey_id %in% prov_surveys]
+  unique_surveys <- prov_surveys
+}
+
+remove_paid_nets <- T
+
+if (remove_paid_nets){
+  itn_data_orig <- copy(itn_data)
+  
+  provenance_wide <- dcast.data.table(provenance_data, 
+                                      dhs_survey_id + clusterid + hhid ~ paid_type, 
+                                      value.var = "net_count")
+  provenance_wide[is.na(free), free:= 0]
+  provenance_wide[is.na(paid), paid:= 0]
+  
+  itn_data <- merge(itn_data,provenance_wide, all=T)
+  
+  # TEMP: drop the extra clusters from the uganda 2018 mis that don't exist in the hh data
+  itn_data <- itn_data[!(dhs_survey_id=="UG2018MIS" & clusterid>320)]
+  
+  # data should be missing only where n_itn==0
+  itn_data[is.na(free), free:= 0]
+  itn_data[is.na(paid), paid:= 0]
+  
+  # confirm one last time that the sum of the net_counts column equals n_itn
+  itn_data[, test_tot_itns:= free + paid]
+
+  # excellent
+  itn_data[n_itn!=test_tot_itns]
+  itn_data[, test_tot_itns:= NULL]
+  
+  # ok, now replace n_itn with the number of free itns only
+  itn_data[, n_itn:= free]
+  
+  # drop the "free" and "paid" columns
+  itn_data[, c("free", "paid") := NULL]
+  
+  setdiff(names(itn_data), names(itn_data_orig))
+  rm(itn_data_orig); gc()
+}
+
 
 ##### Find national-level itn access for each survey
 national_access <- rbindlist(lapply(unique_surveys, function(this_survey){
@@ -157,8 +212,6 @@ access_and_pfpr <- merge(access_by_quintile_hh,
 access_and_pfpr <- merge(access_and_pfpr, national_access, 
                          by= c("dhs_survey_id"), all.x=T)
 
-ggplot(access_and_pfpr, aes(x=pfpr, y=national_access)) +
-  geom_point()
 
 ggplot(access_and_pfpr, aes(x=year, y=pfpr)) +
   geom_point(aes(color=national_access)) +
@@ -166,20 +219,6 @@ ggplot(access_and_pfpr, aes(x=year, y=pfpr)) +
   facet_geo(~name, grid = ssa_grid, label="name") +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
-
-ggplot(access_and_pfpr,
-       aes(x=year, y=access, color=wealth_quintile)) +
-  geom_line() +
-  geom_pointrange(aes(ymin=access-se, ymax=access+se)) +
-  geom_line(aes(y=pfpr), color="black") +
-  geom_point(aes(y=pfpr), color="black") +
-  facet_geo(~name, grid = ssa_grid, label="name") + 
-  scale_color_manual(values = rev(pnw_palette("Bay",5)),
-                     name="Wealth Quintile") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
-  labs(x="", y="ITN Access",
-       title="ITN Access by Country and Time")
 
 # todo: make this story clearer
 ggplot(access_and_pfpr[!is.na(pfpr)], aes(x=wealth_quintile, y=as.factor(pfpr), fill=access)) +
@@ -265,11 +304,6 @@ ggplot(wealth_and_access, aes(x=access_rank_factor, fill=wealth_quintile)) +
   labs(x="",
        y="Count")
 
-# compare wealth index to access--poorly informative
-ggplot(wealth_and_access, aes(x=wealth_index_score, y=access)) +
-  geom_point(aes(color=access_rank_factor)) +
-  facet_grid(~wealth_quintile)+
-  theme_minimal() 
 
 # what is the distribution of surveys across wealth quintile and access? 
 count_surveys_by_group <- wealth_and_access[, list(count=.N), 
@@ -293,16 +327,12 @@ find_wealth_gap <- dcast.data.table(
   wealth_and_access[wealth_quintile %in% c("Poorest", "Richest")],
   country_name + dhs_survey_id ~ wealth_quintile, value.var = "wealth_index_score")
 find_wealth_gap[, wealth_gap:=Richest-Poorest]
-ggplot(find_wealth_gap, aes(x=wealth_gap)) +
-  geom_density()
 
 find_access_gap <- dcast.data.table(
   wealth_and_access[access_rank_factor %in% c("Lowest Access", "Highest Access")],
   country_name + dhs_survey_id ~ access_rank_factor, value.var = "access"
 )
 find_access_gap[, access_gap:=`Highest Access` - `Lowest Access`]
-ggplot(find_access_gap, aes(x=access_gap)) +
-  geom_density()
 
 
 all_gaps <- merge(find_access_gap, find_wealth_gap)
