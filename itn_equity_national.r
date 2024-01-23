@@ -92,8 +92,9 @@ country_survey_map <- merge(country_survey_map, unique(pfpr_data[, list(country_
 provenance_data <- fread(file.path(parent_dir, "cleaned_input_data/provenance_by_hh.csv"))
 prov_surveys <- unique(provenance_data$dhs_survey_id)
 
-# keep a record of the original number of itns (free and paid)
-itn_data[, n_itn_total:= n_itn]
+# keep a record of the original number of itns (free and paid), and access
+itn_data[, n_itn_orig:= n_itn]
+itn_data[, access_orig:= access]
 
 # keep an option to remove the surveys without provenance data, even if you don't account for paid nets
 
@@ -133,6 +134,11 @@ if (remove_paid_nets){
   
   # ok, now replace n_itn with the number of free itns only
   itn_data[, n_itn:= free]
+  
+  # and recalculate access
+  itn_data[, access:= pmin(n_itn*2, n_defacto_pop)/n_defacto_pop]
+  # set to zero for households with no people
+  itn_data[is.na(access) & n_defacto_pop==0, access:=0]
   
   # drop the "free" and "paid" columns
   itn_data[, c("free", "paid") := NULL]
