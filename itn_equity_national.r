@@ -20,6 +20,25 @@ options(digits=4)
 
 rm(list=ls())
 
+# options
+provenance_surveys_only <- T
+remove_paid_nets <- T
+
+if (remove_paid_nets & !provenance_surveys_only){
+  stop("you can't remove paid nets without subsetting to provenance surveys only!")
+}
+
+if (provenance_surveys_only & !remove_paid_nets){
+  suffix <- "_prov_surveys_all_nets"
+} else if (provenance_surveys_only & remove_paid_nets){
+  suffix <- "_prov_surveys_free_nets_only"
+}else if (!provenance_surveys_only & !remove_paid_nets){
+  suffix <- "_all_nets"
+}else{
+  stop("unidentified combo of provenance surveys and remove_paid_nets!")
+}
+
+
 # filepaths
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/"
 input_data_fname <- file.path(parent_dir, "cleaned_input_data/itn_equity_cleaned.csv")
@@ -77,15 +96,15 @@ prov_surveys <- unique(provenance_data$dhs_survey_id)
 itn_data[, n_itn_total:= n_itn]
 
 # keep an option to remove the surveys without provenance data, even if you don't account for paid nets
-provenance_data_only <- T
 
-if (provenance_data_only){
+
+if (provenance_surveys_only){
   # subset down only to the surveys with provenance data
   itn_data <- itn_data[dhs_survey_id %in% prov_surveys]
   unique_surveys <- prov_surveys
 }
 
-remove_paid_nets <- T
+
 
 if (remove_paid_nets){
   itn_data_orig <- copy(itn_data)
@@ -227,11 +246,11 @@ ggplot(access_and_pfpr[!is.na(pfpr)], aes(x=wealth_quintile, y=as.factor(pfpr), 
 
 
 # Let's split these up by number of surveys to see if we can tell a clearer story
-access_by_quintile_hh[, survey_count:=.N, by=.(country_name, wealth_quintile)]
+access_and_pfpr[, survey_count:=.N, by=.(country_name, wealth_quintile)]
 # prettier survey names
-access_by_quintile_hh[, survey_label:= paste(country_name, year)]
+access_and_pfpr[, survey_label:= paste(country_name, year)]
 
-ggplot(access_by_quintile_hh[survey_count==1],
+ggplot(access_and_pfpr[survey_count==1],
        aes(x=wealth_quintile, y=reorder(survey_label, access), fill=access)) +
   geom_tile() +
   geom_text(aes(label=round(access, 2))) +
@@ -242,9 +261,9 @@ ggplot(access_by_quintile_hh[survey_count==1],
 
 
 ### Let's compare wealth inequality to itn access inequality
-access_by_quintile_hh[ , access_rank := order(order(access, decreasing = FALSE)), 
+access_and_pfpr[ , access_rank := order(order(access, decreasing = FALSE)), 
                        by=.(dhs_survey_id) ]
-access_by_quintile_hh[ , access_rank_factor := factor(access_rank,
+access_and_pfpr[ , access_rank_factor := factor(access_rank,
                                                       labels=c("Lowest Access", 
                                                                "Lower Access", 
                                                                "Middle Access", 
@@ -252,14 +271,14 @@ access_by_quintile_hh[ , access_rank_factor := factor(access_rank,
                                                                "Highest Access"))]
 
 # merge on wealth inequity
-setnames(access_by_quintile_hh, "se", "se_access")
+setnames(access_and_pfpr, "se", "se_access")
 setnames(wealth_by_quintile, "se", "se_wealth_index_score")
-setkey(access_by_quintile_hh, NULL)
+setkey(access_and_pfpr, NULL)
 setkey(wealth_by_quintile, NULL)
 wealth_by_quintile[, survey_count:=NULL]
 
-wealth_and_access <- merge(access_by_quintile_hh, wealth_by_quintile, all.x=T)
 
+wealth_and_access <- merge(access_and_pfpr, wealth_by_quintile, all.x=T)
 
 
 # explore wealth quintile specifically
@@ -411,7 +430,6 @@ ggplot(all_gaps, aes(x=year, y=access_gap)) +
 
 
 # look at access gap vs national access and prevalence 
-
 all_gaps <- merge(all_gaps, national_access, by="dhs_survey_id", all.x=T)
 all_gaps <- merge(all_gaps, pfpr_data,
       by=c("country_name", "name", "year"),
@@ -517,4 +535,12 @@ ggplot(all_gaps, aes(x=year, y=access_gap)) +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(y="Access",
        title="Access Gap over Country and Time")
+
+# save files
+write.csv(wealth_and_access, file = file.path(parent_dir, paste0("results/national/wealth_and_access", suffix, ".csv")),
+          row.names = F)
+write.csv(all_gaps, file = file.path(parent_dir, 
+                                     paste0("results/national/access_gaps", suffix, ".csv")),
+          row.names = F)
+
 
