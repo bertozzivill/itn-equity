@@ -122,13 +122,11 @@ ggplot(itn_by_cluster, aes(x=access, y=prev_rdt)) +
 ggplot(itn_by_cluster, aes(x=access, y=prev_micro)) +
   geom_point()
 
-ggplot(itn_by_cluster, aes(x=access, y=prev_rdt)) +
+ggplot(itn_by_cluster, aes(x=access, y=prev_rdt, color=urban_rural)) +
   geom_point() +
   facet_wrap(~dhs_survey_id, scales="free")
 
 # todo: map this
-
- 
 
 # take wealth index by cluster
 wealth_by_cluster <- itn_data[, lapply(.SD, mean, na.rm=T),
@@ -147,12 +145,15 @@ itn_by_cluster <- merge(itn_by_cluster, wealth_by_cluster, all.x=T)
 itn_by_cluster[, survey_label:= paste(country_name, year)]
 
 # scatter plot in every direction
-ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access)) +
-  geom_point(aes(color=prev_rdt)) +
-  geom_smooth(color="black") + 
+ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
+                           color=prev_rdt
+                           )) +
+  geom_point() +
+  #geom_smooth(color="black") + 
   facet_wrap(~survey_label, scales="free") +
   scale_color_distiller(palette="RdYlBu") + 
   theme_minimal()
+
 
 ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets)) +
   geom_point(aes(color=prev_rdt)) +
@@ -169,7 +170,7 @@ ggplot(itn_by_cluster, aes(x=longitude, y=latitude)) +
 
 ggplot(itn_by_cluster, aes(x=wealth_index_score, y=prev_rdt)) +
   geom_point(aes(color=access)) +
-  geom_smooth(color="black") + 
+  #geom_smooth(color="black") + 
   facet_wrap(~survey_label, scales="free") +
   scale_color_distiller(palette="YlGnBu", direction=1) + 
   theme_minimal()
@@ -188,6 +189,13 @@ ggplot(itn_by_cluster, aes(x=access, y=prev_rdt)) +
   scale_color_distiller(palette="YlGn", direction=1) + 
   theme_minimal()
 
+ggplot(itn_by_cluster, aes(x=access, y=prev_rdt)) +
+  geom_point(aes(color=urban_rural)) +
+  geom_smooth(color="black") + 
+  facet_wrap(~survey_label, scales="free") +
+  #scale_color_distiller(palette="YlGn", direction=1) + 
+  theme_minimal()
+
 ggplot(itn_by_cluster, aes(x=access_all_nets, y=prev_rdt)) +
   geom_point(aes(color=wealth_index_score)) +
   geom_smooth(color="black") + 
@@ -195,7 +203,9 @@ ggplot(itn_by_cluster, aes(x=access_all_nets, y=prev_rdt)) +
   scale_color_distiller(palette="YlGn", direction=1) + 
   theme_minimal()
 
-# figure out bivariate heatmaps
+
+
+# bivariate heatmaps by quantile
 # quantiles for access, wealth, and pfpr
 
 # remove mauritania for now cuz it messes up the breaks
@@ -242,38 +252,6 @@ if (nrow(itn_by_cluster[is.na(access_quantile_all_nets)])>0){
   itn_by_cluster[, c("max_access", "min_access"):=NULL]
 }
 
-# null_quants <- itn_by_cluster[is.na(access_quantile), list(dhs_survey_id, access, access_quantile) ]
-# test_breaks <- itn_by_cluster[, list(quant=0:n_quants,
-#                                      quant_val=wtd.quantile(x = access,
-#                                                        weights=hh_sample_wt,
-#                                                        probs=(0:n_quants)/n_quants)),
-#                               by=dhs_survey_id]
-# test_breaks <- dcast.data.table(test_breaks[quant %in% c(0,10)], dhs_survey_id ~ quant, value.var="quant_val")
-# names(test_breaks) <- c("dhs_survey_id", "lower_bound", "upper_bound")
-# 
-# null_quants <- merge(null_quants, test_breaks)
-# null_quants[, lower_diff:=access-lower_bound]
-# null_quants[, upper_diff:=upper_bound-access]
-
-# prevalence doesn't work because there are too many zeros
-# itn_by_cluster[, prev_quantile:= cut(x = prev_rdt, 
-#                                      breaks = wtd.quantile(x = prev_rdt, 
-#                                                            weights=hh_sample_wt,
-#                                                            probs=(0:n_quants)/n_quants),
-#                                      labels = FALSE, include.lowest = TRUE),
-#                by=dhs_survey_id]
-# 
-# test_breaks <- itn_by_cluster[, list(quant=0:n_quants,
-#                                      test=wtd.quantile(x = prev_rdt, 
-#                                         weights=hh_sample_wt,
-#                                         probs=(0:n_quants)/n_quants)),
-#                by=dhs_survey_id]
-# ggplot(test_breaks, aes(x=quant, y=test)) +
-#   geom_bar(stat="identity") +
-#   facet_wrap(~dhs_survey_id)
-
-
-
 
 quantile_means <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na.rm=T),
                                  .SDcols = c("wealth_index_score", "access", "prev_rdt"),
@@ -284,12 +262,27 @@ quantile_means <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na
                                          wealth_quantile,
                                          access_quantile)]
 
-ggplot(quantile_means, 
+ggplot(quantile_means[country_name=="Senegal"], 
        aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
   geom_tile() + 
   scale_fill_distiller(palette="RdYlBu") + 
   facet_wrap(~survey_label) + 
   theme_minimal()
+
+ggplot(quantile_means, 
+       aes(x=wealth_quantile, y=access_quantile, fill=access)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="YlGnBu", direction = 1) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal()
+
+ggplot(quantile_means, 
+       aes(x=wealth_quantile, y=access_quantile, fill=wealth_index_score)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="YlGn", direction = 1) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal()
+
 
 quantile_means_all_nets <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na.rm=T),
                                  .SDcols = c("wealth_index_score", "access_all_nets", "prev_rdt"),
@@ -307,7 +300,109 @@ ggplot(quantile_means_all_nets,
   facet_wrap(~survey_label) + 
   theme_minimal()
 
-  
+
+quantile_means_urban_rural <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na.rm=T),
+                                 .SDcols = c("wealth_index_score", "access", "prev_rdt"),
+                                 by=list(dhs_survey_id,
+                                         country_name,
+                                         year,
+                                         survey_label,
+                                         urban_rural,
+                                         wealth_quantile,
+                                         access_quantile)]
+
+ggplot(quantile_means_urban_rural[!is.na(urban_rural)
+                                  & country_name %in% c("Senegal")], 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="RdYlBu") + 
+  facet_grid(urban_rural~survey_label) + 
+  theme_minimal()
+
+
+## also look at scatter plots with quantiles
+ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access,
+                           color=factor(wealth_quantile)
+)) +
+  geom_point() +
+  geom_smooth(color="black") + 
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  theme_minimal()
+
+ggplot(itn_by_cluster, aes(x=wealth_index_score, y=prev_rdt,
+                           color=factor(wealth_quantile)
+                           )) +
+  geom_point() +
+  #geom_smooth(color="black") + 
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile") +
+  theme_minimal()
+
+ggplot(itn_by_cluster, aes(x=access, y=prev_rdt,
+                           color=factor(wealth_quantile)
+)) +
+  geom_point() +
+  # geom_smooth(color="black") + 
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     #name="Wealth Quintile"
+                     ) +
+  theme_minimal()
+
+ggplot(itn_by_cluster[country_name=="Nigeria"], aes(x=access, y=prev_rdt,
+                           color=factor(wealth_quantile)
+)) +
+  geom_point() +
+  # geom_smooth(color="black") + 
+  facet_grid(wealth_quantile~survey_label, scales="free") +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     #name="Wealth Quintile"
+  ) +
+  theme_minimal()
+
+
+#  let's try keeping wealth in quintiles, but splitting prevalence and itn 
+# coverage into absolute cutoffs
+access_cutoffs <- seq(0,1,length.out=5)
+prev_cutoffs <- c(0, 0.25, 0.75, 1)
+
+itn_by_cluster[, access_group:= cut(x = access, 
+                                       breaks = access_cutoffs,
+                                       labels = FALSE, include.lowest = TRUE)]
+
+itn_by_cluster[, prev_group:= cut(x = prev_rdt, 
+                                    breaks = prev_cutoffs,
+                                    labels = FALSE, include.lowest = TRUE)]
+
+
+ggplot(itn_by_cluster, aes(x=access, y=prev_rdt,
+                           color=factor(wealth_quantile)
+)) +
+  geom_point() +
+  # geom_smooth(color="black") + 
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)), name="Wealth Quintile") +
+  theme_minimal()
+
+group_means_access <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na.rm=T),
+                                 .SDcols = c("wealth_index_score", "access", "prev_rdt"),
+                                 by=list(dhs_survey_id,
+                                         country_name,
+                                         year,
+                                         survey_label,
+                                         wealth_quantile,
+                                         prev_group)]
+
+ggplot(group_means_access, 
+       aes(x=wealth_quantile, y=prev_group, fill=access)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="YlGnBu", direction=1) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal()
+
 
 
 # to consider adding wealth quantile: we could either calculate wealth quintile by *cluster*, 
