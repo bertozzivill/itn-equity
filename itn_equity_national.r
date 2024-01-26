@@ -94,6 +94,7 @@ prov_surveys <- unique(provenance_data$dhs_survey_id)
 
 # keep a record of the original number of itns (free and paid), and access
 itn_data[, n_itn_orig:= n_itn]
+itn_data[, itn_theoretical_capacity_orig:= itn_theoretical_capacity]
 itn_data[, access_orig:= access]
 
 # keep an option to remove the surveys without provenance data, even if you don't account for paid nets
@@ -116,10 +117,7 @@ if (remove_paid_nets){
   provenance_wide[is.na(free), free:= 0]
   provenance_wide[is.na(paid), paid:= 0]
   
-  itn_data <- merge(itn_data,provenance_wide, all=T)
-  
-  # TEMP: drop the extra clusters from the uganda 2018 mis that don't exist in the hh data
-  itn_data <- itn_data[!(dhs_survey_id=="UG2018MIS" & clusterid>320)]
+  itn_data <- merge(itn_data,provenance_wide, all.x=T)
   
   # data should be missing only where n_itn==0
   itn_data[is.na(free), free:= 0]
@@ -136,7 +134,8 @@ if (remove_paid_nets){
   itn_data[, n_itn:= free]
   
   # and recalculate access
-  itn_data[, access:= pmin(n_itn*2, n_defacto_pop)/n_defacto_pop]
+  itn_data[, itn_theoretical_capacity:=pmin(n_itn*2, n_defacto_pop)]
+  itn_data[, access:= itn_theoretical_capacity/n_defacto_pop]
   # set to zero for households with no people
   itn_data[is.na(access) & n_defacto_pop==0, access:=0]
   
@@ -145,6 +144,9 @@ if (remove_paid_nets){
   
   setdiff(names(itn_data), names(itn_data_orig))
   rm(itn_data_orig); gc()
+  
+  write.csv(itn_data, file=file.path(parent_dir, "cleaned_input_data/itn_equity_free_nets_cleaned.csv"),
+            row.names = F)
 }
 
 
