@@ -15,6 +15,7 @@ library(survey)
 library(wesanderson)
 library(PNWColors)
 library(geofacet)
+library(gridExtra)
 
 options(digits=4)
 
@@ -22,7 +23,7 @@ rm(list=ls())
 
 # filepaths
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/"
-input_data_fname <- file.path(parent_dir, "cleaned_input_data/itn_equity_cleaned.csv")
+input_data_fname <- file.path(parent_dir, "cleaned_input_data/itn_equity_free_nets_cleaned.csv")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
 
@@ -197,6 +198,45 @@ access_by_quintile_hh <- access_by_quintile[metric=="wealth_quintile_by_househol
 access_by_quintile_hh[, name:=country_name]
 
 
+# merge on prop of urban/rural by wealth quintile
+access_by_quintile_hh <- merge(access_by_quintile_hh, quint_props[, list(dhs_survey_id,
+                                                        urban_rural,
+                                                        wealth_quintile=wealth_quintile_by_household,
+                                                        prop_among_urban_rural=prop_by_urban_rural)],
+              by=c("dhs_survey_id", "urban_rural", "wealth_quintile"), all=T)
+
+example_surveys <- c("RW2019DHS", "NG2021MIS", "SN2020MIS")
+
+access_plots<- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
+       aes(x=urban_rural,
+           y=access,
+           fill=wealth_quintile)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  # facet_wrap(~dhs_survey_id) +
+  facet_grid(dhs_survey_id~.) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access")
+
+prop_plots <- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
+       aes(x=urban_rural,
+           y=prop_among_urban_rural,
+           fill=wealth_quintile)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  # facet_wrap(~dhs_survey_id) +
+  facet_grid(dhs_survey_id ~ .) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Proportion")
+
+grid.arrange(prop_plots, access_plots, nrow=1)
+
 ggplot(access_by_quintile_hh[name %in% example_countries],
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
@@ -207,7 +247,9 @@ ggplot(access_by_quintile_hh[name %in% example_countries],
   theme_minimal()
 
 
-ggplot(access_by_quintile_hh[urban_rural=="Urban"],
+
+
+ggplot(access_by_quintile_hh[urban_rural=="Rural"],
        aes(x=year, y=access, color=wealth_quintile)) +
   geom_line() +
   geom_point() +

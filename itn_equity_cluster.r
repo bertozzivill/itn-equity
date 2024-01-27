@@ -262,7 +262,7 @@ quantile_means <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na
                                          wealth_quantile,
                                          access_quantile)]
 
-ggplot(quantile_means[country_name=="Senegal"], 
+ggplot(quantile_means, 
        aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
   geom_tile() + 
   scale_fill_distiller(palette="RdYlBu") + 
