@@ -90,13 +90,24 @@ ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_percentage, y=percent
   labs(x="",
        y="Percent of 'All Nets' Access")
 
-compare_nets_survey_level_wide <- compare_nets_survey_level_wide[order(`free only`)]
+compare_nets_survey_level_wide <- compare_nets_survey_level_wide[order(`all nets`)]
 compare_nets_survey_level_wide[, ordered_label_free_access:= factor(seq_len(.N), labels=survey_label)]
 
 ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
        ) +
   geom_hline(yintercept=80) + 
-  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.5, fill="#00BFC4") + 
+  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.65, fill="#00BFC4") + 
+  # geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75, fill="#00BFC4") + 
+  geom_text(aes(label=round(`all nets`*100, 0), y=`all nets`*100-5)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="ITN Access")
+
+ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
+) +
+  geom_hline(yintercept=80) + 
+  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.65, fill="#00BFC4") + 
   geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75, fill="#00BFC4") + 
   geom_text(aes(label=round(percent_of_all, 0), y=`free only`*100-5)) +
   theme_minimal() +
@@ -118,6 +129,7 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100, fill
   labs(x="",
        y="Access",
        title="Access (all ITNs)")
+
 
 ggplot(compare_nets[type=="free only"], aes(x=wealth_quintile, y=access*100, fill=wealth_quintile)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -150,6 +162,19 @@ ggplot(compare_nets_wide, aes(x=wealth_quintile, y=percent_of_all, fill=wealth_q
   labs(x="",
         y="Percent of 'All Nets' Access")
 
+
+ggplot(compare_nets_wide, aes(x=wealth_quintile, fill=wealth_quintile)) +
+  # geom_hline(yintercept=80) + 
+  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.65) + 
+  geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75) + 
+  geom_text(aes(label=round(percent_of_all, 0), y=`free only`*100-5)) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  theme_minimal() +
+  facet_wrap(~survey_label) +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="ITN Access")
 
 # replicate the access gap plots from last script
 ggplot(compare_gaps, aes(x=factor(yrs_since_campaign), 

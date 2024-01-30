@@ -172,7 +172,7 @@ access_by_quintile <- rbindlist(lapply(unique_surveys, function(this_survey){
   these_means <- summarize_survey(data=itn_data[dhs_survey_id==this_survey], 
                                   ids = "clusterid",
                                   weight_vals = weight_vals,
-                                  metric_vals = "access",
+                                  metric_vals = c("access", "access_orig"),
                                   by_vals = c("~wealth_quintile_by_population+urban_rural",
                                               "~wealth_quintile_by_household+urban_rural",
                                               "~wealth_quintile_dhs+urban_rural")
@@ -207,6 +207,8 @@ access_by_quintile_hh <- merge(access_by_quintile_hh, quint_props[, list(dhs_sur
 
 example_surveys <- c("RW2019DHS", "NG2021MIS", "SN2020MIS")
 
+access_by_quintile_hh[, survey_label := paste(country_name, year)]
+
 access_plots<- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
        aes(x=urban_rural,
            y=access,
@@ -214,12 +216,34 @@ access_plots<- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
   geom_bar(stat="identity", position="dodge") +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
+  ylim(0, 0.8) + 
   # facet_wrap(~dhs_survey_id) +
-  facet_grid(dhs_survey_id~.) +
+  facet_grid(survey_label~.) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        legend.position = "none") +
   labs(x="",
-       y="Access")
+       y="Access",
+       title="ITN Access, Free Nets Only")
+
+
+
+access_allnets_plots<- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
+                      aes(x=urban_rural,
+                          y=access_orig,
+                          fill=wealth_quintile)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  ylim(0, 0.8) + 
+  # facet_wrap(~dhs_survey_id) +
+  facet_grid(survey_label~.) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        legend.position = "none") +
+  labs(x="",
+       y="Access",
+       title="ITN Access, All Nets")
 
 prop_plots <- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
        aes(x=urban_rural,
@@ -229,13 +253,15 @@ prop_plots <- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   # facet_wrap(~dhs_survey_id) +
-  facet_grid(dhs_survey_id ~ .) + 
+  facet_grid(survey_label ~ .) + 
   theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        legend.position = "none") +
   labs(x="",
-       y="Proportion")
+       y="Proportion",
+       title="Proportion of Population")
 
-grid.arrange(prop_plots, access_plots, nrow=1)
+grid.arrange(prop_plots, access_allnets_plots, access_plots, nrow=1)
 
 ggplot(access_by_quintile_hh[name %in% example_countries],
        aes(x=year, y=access, color=wealth_quintile)) +
