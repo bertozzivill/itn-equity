@@ -194,7 +194,10 @@ table(missing_props$source_1_type)
 # aha, ok, we start to get info about net provenance in 2015
 ggplot(missing_props, aes(x=year, fill=source_1_type)) +
   geom_bar() +
-  theme_minimal() 
+  theme_minimal() +
+  labs(x="Year", 
+       y="Count",
+       fill="Provenance Data?")
 
 # let's subset down to the 44 surveys that have responses and take a look at the contents
 

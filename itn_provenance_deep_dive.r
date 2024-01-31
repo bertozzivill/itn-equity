@@ -96,7 +96,7 @@ compare_nets_survey_level_wide[, ordered_label_free_access:= factor(seq_len(.N),
 ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
        ) +
   geom_hline(yintercept=80) + 
-  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.65, fill="#00BFC4") + 
+  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.85, fill="#00BFC4") + 
   # geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75, fill="#00BFC4") + 
   geom_text(aes(label=round(`all nets`*100, 0), y=`all nets`*100-5)) +
   theme_minimal() +
@@ -107,8 +107,8 @@ ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
 ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
 ) +
   geom_hline(yintercept=80) + 
-  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.65, fill="#00BFC4") + 
-  geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75, fill="#00BFC4") + 
+  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.85, fill="#f8766d") + 
+  geom_bar(aes(y=`free only`*100),  stat='identity', alpha=1, fill="#00BFC4") + 
   geom_text(aes(label=round(percent_of_all, 0), y=`free only`*100-5)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
@@ -151,16 +151,18 @@ compare_nets_wide <- dcast.data.table(compare_nets,
 compare_nets_wide[, diff:= `all nets` - `free only`]
 compare_nets_wide[, percent_of_all:=`free only` / `all nets` * 100]
 
-ggplot(compare_nets_wide, aes(x=wealth_quintile, y=percent_of_all, fill=wealth_quintile)) + 
-  geom_bar(stat="identity", alpha=0.85) + 
+ggplot(compare_nets_wide, aes(x=wealth_quintile, y=percent_of_all, fill=percent_of_all)) + 
+  geom_bar(stat="identity") + 
   geom_text(aes(label=round(percent_of_all, 0),
-                y=percent_of_all+10)) +
-  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
-                    name="Wealth Quintile") +
+                y=percent_of_all-15)) +
+  # scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+  #                   name="Wealth Quintile") +
+  scale_fill_distiller(palette = "RdYlBu", direction = 1, name="Percent") +
   theme_minimal() +
   facet_wrap(~survey_label) +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-        y="Percent of 'All Nets' Access")
+        y="Percentage of Access Contributed by Free Nets" )
 
 
 ggplot(compare_nets_wide, aes(x=wealth_quintile, fill=wealth_quintile)) +
