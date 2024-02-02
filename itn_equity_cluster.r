@@ -262,12 +262,84 @@ quantile_means <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na
                                          wealth_quantile,
                                          access_quantile)]
 
+
+# find national rdt prevalence by survey
+national_prev <- itn_by_cluster[, list(nat_prev=weighted.mean(prev_rdt, hh_sample_wt,
+                                                              na.rm=T)),
+                                by=list(survey_label)]
+national_prev <- national_prev[order(nat_prev)]
+national_prev[, prev_order:= factor(seq_len(.N), labels=survey_label)]
+
+quantile_means <- merge(quantile_means, national_prev, all.x=T)
+
+# test_national_prev <- rbindlist(lapply(unique(itn_by_cluster$dhs_survey_id),
+#                                        function(this_survey){
+#   these_means <- summarize_survey(data=itn_by_cluster[dhs_survey_id==this_survey],
+#                                   ids = "clusterid",
+#                                   weight_vals = "hh_sample_wt",
+#                                   metric_vals = "prev_rdt"
+#   )
+#   these_means[, dhs_survey_id:=this_survey]
+# }))
+# 
+# test <- merge(national_prev, test_national_prev[, list(dhs_survey_id, test_prev=mean)])
+# test[, diff:=nat_prev-test_prev]
+
+
+######## FOR REVIEW ##################
+example_survey <- "Cote d'Ivoire 2021" 
+ggplot(quantile_means[survey_label==example_survey], 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="RdYlBu", 
+                       name= "RDT\nPrevalence",
+                       limits=c(0, 0.8)) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+
 ggplot(quantile_means, 
        aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
   geom_tile() + 
-  scale_fill_distiller(palette="RdYlBu") + 
-  facet_wrap(~survey_label) + 
-  theme_minimal()
+  scale_fill_distiller(palette="RdYlBu", name= "RDT\nPrevalence") + 
+  facet_wrap(~prev_order) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+
+ggplot(quantile_means, 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile(alpha=0.2) + 
+  geom_tile(data=quantile_means[survey_label=="Cote d'Ivoire 2021"]) + 
+  scale_fill_distiller(palette="RdYlBu", name= "RDT\nPrevalence") + 
+  facet_wrap(~prev_order) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+
+ggplot(quantile_means, 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile(alpha=0.2) + 
+  geom_tile(data=quantile_means[survey_label=="Mozambique 2018"]) + 
+  scale_fill_distiller(palette="RdYlBu", name= "RDT\nPrevalence") + 
+  facet_wrap(~prev_order) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+
+ggplot(quantile_means, 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile(alpha=0.2) + 
+  geom_tile(data=quantile_means[survey_label=="Uganda 2016"]) + 
+  scale_fill_distiller(palette="RdYlBu", name= "RDT\nPrevalence") + 
+  facet_wrap(~prev_order) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+
+######## FOR REVIEW ##################
+
 
 ggplot(quantile_means, 
        aes(x=wealth_quantile, y=access_quantile, fill=access)) +
@@ -338,11 +410,20 @@ quantile_cutoffs <- itn_by_cluster[,
                   by=list(dhs_survey_id, survey_label)]
 
 
-ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
+
+
+######## FOR REVIEW ##################
+itn_by_cluster <- merge(itn_by_cluster, national_prev, by="survey_label", all.x=T)
+quantile_cutoffs <- merge(quantile_cutoffs, national_prev, by="survey_label", all.x=T)
+
+
+ggplot(itn_by_cluster[survey_label==example_survey], 
+       aes(x=wealth_index_score, y=access_all_nets,
                            color=factor(wealth_quantile)
 )) +
   geom_point() +
-  geom_vline(data=quantile_cutoffs, aes(xintercept=wealth_cutoff)) + 
+  geom_vline(data=quantile_cutoffs[survey_label==example_survey], 
+             aes(xintercept=wealth_cutoff)) + 
   facet_wrap(~survey_label, scales="free") +
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Wealth Quintile") +
@@ -350,11 +431,13 @@ ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
 
-ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
+ggplot(itn_by_cluster[survey_label==example_survey], 
+       aes(x=wealth_index_score, y=access_all_nets,
                            color=factor(access_quantile_all_nets)
 )) +
   geom_point() +
-  geom_hline(data=quantile_cutoffs, aes(yintercept=access_all_nets_cutoff)) +
+  geom_hline(data=quantile_cutoffs[survey_label==example_survey],
+             aes(yintercept=access_all_nets_cutoff)) +
   facet_wrap(~survey_label, scales="free") +
   scale_color_manual(values = rev(pnw_palette("Bay",5)),
                      name="Access Quintile") +
@@ -362,6 +445,19 @@ ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
 
+ggplot(itn_by_cluster[survey_label==example_survey], 
+       aes(x=wealth_index_score, y=access_all_nets,
+                           color=prev_rdt)) +
+  geom_point() +
+  geom_vline(data=quantile_cutoffs[survey_label==example_survey],
+             aes(xintercept=wealth_cutoff)) + 
+  geom_hline(data=quantile_cutoffs[survey_label==example_survey], 
+             aes(yintercept=access_all_nets_cutoff)) +
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_distiller(palette="RdYlBu", name="RDT\nPrevalence") +
+  theme_minimal() +
+  labs(x="Wealth Index Score",
+       y="Access (All Nets)")
 
 
 ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
@@ -369,21 +465,12 @@ ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
   geom_point() +
   geom_vline(data=quantile_cutoffs, aes(xintercept=wealth_cutoff)) + 
   geom_hline(data=quantile_cutoffs, aes(yintercept=access_all_nets_cutoff)) +
-  facet_wrap(~survey_label, scales="free") +
+  facet_wrap(~prev_order, scales="free") +
   scale_color_distiller(palette="RdYlBu", name="RDT\nPrevalence") +
   theme_minimal() +
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
-
-ggplot(itn_by_cluster, aes(x=wealth_index_score, y=prev_rdt,
-                           color=factor(wealth_quantile)
-                           )) +
-  geom_point() +
-  #geom_smooth(color="black") + 
-  facet_wrap(~survey_label, scales="free") +
-  scale_color_manual(values = rev(pnw_palette("Bay",5)),
-                     name="Wealth Quintile") +
-  theme_minimal()
+######## FOR REVIEW ##################
 
 ggplot(itn_by_cluster, aes(x=access, y=prev_rdt,
                            color=factor(wealth_quantile)

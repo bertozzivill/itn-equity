@@ -130,22 +130,114 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100, fill
        y="Access",
        title="Access (all ITNs)")
 
+# can we facet this based on the trend and national access?
+highest_access <- compare_nets[access_rank==5, list(dhs_survey_id, type, highest_access_quintile=wealth_quintile)]
+compare_nets <- merge(compare_nets, highest_access)
+compare_nets <- compare_nets[order(type, highest_access_quintile, national_access)]
+compare_nets[, ordered_label_all_nets:= factor(seq_len(.N), labels=survey_label), 
+             by=list(type, wealth_quintile)]
 
-ggplot(compare_nets[type=="free only"], aes(x=wealth_quintile, y=access*100, fill=wealth_quintile)) +
+ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
+  geom_bar(data = compare_nets[type=="all nets"],
+           stat="identity",
+           aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
                 y=access*100+10)) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
-  facet_wrap(~survey_label) + 
+  facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
        y="Access",
-       title="Access (free ITNs only)")
+       title="Access (all ITNs)")
+
+
+# grey out all but each quintile in turn
+ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
+  geom_bar(stat="identity", alpha=0.85) + 
+  geom_bar(data = compare_nets[type=="all nets" & highest_access_quintile=="Poorest"],
+           stat="identity",
+           aes(fill =wealth_quintile)) +
+  geom_text(aes(label=round(access*100, 0),
+                y=access*100+10)) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_wrap(~ordered_label_all_nets) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access",
+       title="Access (all ITNs)")
+
+ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
+  geom_bar(stat="identity", alpha=0.85) + 
+  geom_bar(data = compare_nets[type=="all nets" & highest_access_quintile=="Poorer"],
+           stat="identity",
+           aes(fill =wealth_quintile)) +
+  geom_text(aes(label=round(access*100, 0),
+                y=access*100+10)) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_wrap(~ordered_label_all_nets) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access",
+       title="Access (all ITNs)")
+
+ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
+  geom_bar(stat="identity", alpha=0.85) + 
+  geom_bar(data = compare_nets[type=="all nets" & highest_access_quintile=="Middle"],
+           stat="identity",
+           aes(fill =wealth_quintile)) +
+  geom_text(aes(label=round(access*100, 0),
+                y=access*100+10)) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_wrap(~ordered_label_all_nets) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access",
+       title="Access (all ITNs)")
+
+ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
+  geom_bar(stat="identity", alpha=0.85) + 
+  geom_bar(data = compare_nets[type=="all nets" & highest_access_quintile=="Richer"],
+           stat="identity",
+           aes(fill =wealth_quintile)) +
+  geom_text(aes(label=round(access*100, 0),
+                y=access*100+10)) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_wrap(~ordered_label_all_nets) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access",
+       title="Access (all ITNs)")
+
+ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
+  geom_bar(stat="identity", alpha=0.85) + 
+  geom_bar(data = compare_nets[type=="all nets" & highest_access_quintile=="Richest"],
+           stat="identity",
+           aes(fill =wealth_quintile)) +
+  geom_text(aes(label=round(access*100, 0),
+                y=access*100+10)) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_wrap(~ordered_label_all_nets) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access",
+       title="Access (all ITNs)")
+
 
 compare_nets_wide <- dcast.data.table(compare_nets,
-                                      dhs_survey_id + country_name + name + iso3 + year +  survey_label + wealth_quintile + year ~ type,
+                                      dhs_survey_id + country_name + name + iso3 + year +  survey_label + ordered_label_all_nets +  wealth_quintile + year ~ type,
                                       value.var = "access")
 
 compare_nets_wide[, diff:= `all nets` - `free only`]
@@ -155,43 +247,15 @@ ggplot(compare_nets_wide, aes(x=wealth_quintile, y=percent_of_all, fill=percent_
   geom_bar(stat="identity") + 
   geom_text(aes(label=round(percent_of_all, 0),
                 y=percent_of_all-15)) +
-  # scale_fill_manual(values = rev(pnw_palette("Bay",5)),
-  #                   name="Wealth Quintile") +
   scale_fill_distiller(palette = "RdYlBu", direction = 1, name="Percent") +
   theme_minimal() +
-  facet_wrap(~survey_label) +
+  facet_wrap(~ordered_label_all_nets) +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
         y="Percentage of Access Contributed by Free Nets" )
 
 
-ggplot(compare_nets_wide, aes(x=wealth_quintile, fill=wealth_quintile)) +
-  # geom_hline(yintercept=80) + 
-  geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.65) + 
-  geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75) + 
-  geom_text(aes(label=round(percent_of_all, 0), y=`free only`*100-5)) +
-  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
-                    name="Wealth Quintile") +
-  theme_minimal() +
-  facet_wrap(~survey_label) +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
-  labs(x="",
-       y="ITN Access")
-
 # replicate the access gap plots from last script
-ggplot(compare_gaps, aes(x=factor(yrs_since_campaign), 
-                         y=access_gap, color=`Highest Access  Wealth Quintile`)) +
-  # geom_violin(aes(group=yrs_since_campaign), alpha=0.5) +
-  geom_boxplot(aes(group=yrs_since_campaign)) +
-  geom_point() +
-  # facet_grid(type~`Highest Access  Wealth Quintile`) +
-  facet_grid(`Highest Access  Wealth Quintile`~ type) +
-  scale_color_manual(values = rev(pnw_palette("Bay",5)),
-                     name="Wealth Quintile\nwith Highest Access") +
-  theme_minimal() +
-  labs(x="Years Since Last Campaign",
-       y="Access Gap")
-
 ggplot(compare_nets, aes(x=access_rank_factor, fill=wealth_quintile)) +
   geom_bar()+
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
@@ -214,6 +278,19 @@ ggplot(compare_nets, aes(x=wealth_quintile, y=access, fill=wealth_quintile)) +
   theme_minimal() +
   labs(x="",
        y="ITN Access")
+
+ggplot(compare_gaps, aes(x=factor(yrs_since_campaign), 
+                         y=access_gap, color=`Highest Access  Wealth Quintile`)) +
+  # geom_violin(aes(group=yrs_since_campaign), alpha=0.5) +
+  geom_boxplot(aes(group=yrs_since_campaign)) +
+  geom_point() +
+  # facet_grid(type~`Highest Access  Wealth Quintile`) +
+  facet_grid(`Highest Access  Wealth Quintile`~ type) +
+  scale_color_manual(values = rev(pnw_palette("Bay",5)),
+                     name="Wealth Quintile\nwith Highest Access") +
+  theme_minimal() +
+  labs(x="Years Since Last Campaign",
+       y="Access Gap")
 
 ggplot(compare_nets[type=="free only"],
        aes(x=year, y=access, color=wealth_quintile)) +
