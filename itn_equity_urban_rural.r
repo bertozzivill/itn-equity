@@ -23,6 +23,7 @@ rm(list=ls())
 
 # filepaths
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/"
+out_dir <- file.path(parent_dir, "results/gr_plots")
 input_data_fname <- file.path(parent_dir, "cleaned_input_data/itn_equity_free_nets_cleaned.csv")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
@@ -118,7 +119,7 @@ urban_richest <- urban_richest[order(prop_by_urban_rural, decreasing=T)]
 urban_richest[, richest_order:= factor(seq_len(.N), labels = survey_label)]
 quint_props <- merge(quint_props, urban_richest[, list(survey_label, richest_order)])
 
-ggplot(quint_props,
+ggplot(quint_props[!survey_label %in% "Senegal 2017"], # cut one survey to make it square, senegal 2017 looks much like senegal 2019 and 2020
        aes(x=urban_rural,
            y=prop_by_urban_rural,
            fill=wealth_quintile_by_household)) +
@@ -131,7 +132,7 @@ ggplot(quint_props,
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
        y="Proportion")
-
+ggsave("urban_rural_props.svg", path=out_dir, width = 12, height=8)
 
 
 
@@ -260,8 +261,11 @@ prop_plots <- ggplot(access_by_quintile_hh[dhs_survey_id %in% example_surveys],
   labs(x="",
        y="Proportion",
        title="Proportion of Population")
-
+ 
+svg(file = file.path(out_dir, "urban_rural_examples.svg"), width=11, height=7)
 grid.arrange(prop_plots, access_allnets_plots, access_plots, nrow=1)
+dev.off()
+
 
 ggplot(access_by_quintile_hh[name %in% example_countries],
        aes(x=year, y=access, color=wealth_quintile)) +

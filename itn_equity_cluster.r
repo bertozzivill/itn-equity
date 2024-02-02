@@ -19,6 +19,7 @@ rm(list=ls())
 
 # filepaths
 parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/"
+out_dir <- file.path(parent_dir, "results/gr_plots")
 # choosing to keep only the surveys for which we have provenance data
 input_data_fname <- file.path(parent_dir, "cleaned_input_data/itn_equity_free_nets_cleaned.csv")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
@@ -298,6 +299,45 @@ ggplot(quantile_means[survey_label==example_survey],
   theme_minimal() +
   labs(x= "Wealth Quintile",
        y= "Access Quintile")
+ggsave("cluster_grid_civ.svg", path=out_dir, width = 4.5, height=3)
+
+ggplot(quantile_means[survey_label=="Benin 2017"], 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="RdYlBu", 
+                       name= "RDT\nPrevalence",
+                       limits=c(0, 0.8)) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+ggsave("cluster_grid_ben.svg", path=out_dir, width = 4.5, height=3)
+
+
+ggplot(quantile_means[survey_label=="Mozambique 2018"], 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="RdYlBu", 
+                       name= "RDT\nPrevalence",
+                       limits=c(0, 0.8)) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+ggsave("cluster_grid_moz.svg", path=out_dir, width = 4.5, height=3)
+
+
+ggplot(quantile_means[survey_label=="Uganda 2016"], 
+       aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
+  geom_tile() + 
+  scale_fill_distiller(palette="RdYlBu", 
+                       name= "RDT\nPrevalence",
+                       limits=c(0, 0.8)) + 
+  facet_wrap(~survey_label) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+ggsave("cluster_grid_uga.svg", path=out_dir, width = 4.5, height=3)
 
 ggplot(quantile_means, 
        aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
@@ -307,11 +347,13 @@ ggplot(quantile_means,
   theme_minimal() +
   labs(x= "Wealth Quintile",
        y= "Access Quintile")
+ggsave("cluster_grid_all.svg", path=out_dir, width = 12, height=8)
+
 
 ggplot(quantile_means, 
        aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +
   geom_tile(alpha=0.2) + 
-  geom_tile(data=quantile_means[survey_label=="Cote d'Ivoire 2021"]) + 
+  geom_tile(data=quantile_means[survey_label=="Benin 2017"]) + 
   scale_fill_distiller(palette="RdYlBu", name= "RDT\nPrevalence") + 
   facet_wrap(~prev_order) + 
   theme_minimal() +
@@ -430,6 +472,7 @@ ggplot(itn_by_cluster[survey_label==example_survey],
   theme_minimal() +
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
+ggsave("cluster_points_wealth_civ.svg", path=out_dir, width = 4.5, height=3)
 
 ggplot(itn_by_cluster[survey_label==example_survey], 
        aes(x=wealth_index_score, y=access_all_nets,
@@ -444,6 +487,8 @@ ggplot(itn_by_cluster[survey_label==example_survey],
   theme_minimal() +
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
+ggsave("cluster_points_access_civ.svg", path=out_dir, width = 4.5, height=3)
+
 
 ggplot(itn_by_cluster[survey_label==example_survey], 
        aes(x=wealth_index_score, y=access_all_nets,
@@ -458,6 +503,56 @@ ggplot(itn_by_cluster[survey_label==example_survey],
   theme_minimal() +
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
+ggsave("cluster_points_civ.svg", path=out_dir, width = 4.5, height=3)
+
+
+ggplot(itn_by_cluster[survey_label=="Benin 2017"], 
+       aes(x=wealth_index_score, y=access_all_nets,
+           color=prev_rdt)) +
+  geom_point() +
+  geom_vline(data=quantile_cutoffs[survey_label=="Benin 2017"],
+             aes(xintercept=wealth_cutoff)) + 
+  geom_hline(data=quantile_cutoffs[survey_label=="Benin 2017"], 
+             aes(yintercept=access_all_nets_cutoff)) +
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_distiller(palette="RdYlBu", name="RDT\nPrevalence") +
+  theme_minimal() +
+  labs(x="Wealth Index Score",
+       y="Access (All Nets)")
+ggsave("cluster_points_ben.svg", path=out_dir, width = 4.5, height=3)
+
+
+ggplot(itn_by_cluster[survey_label=="Mozambique 2018"], 
+       aes(x=wealth_index_score, y=access_all_nets,
+           color=prev_rdt)) +
+  geom_point() +
+  geom_vline(data=quantile_cutoffs[survey_label=="Mozambique 2018"],
+             aes(xintercept=wealth_cutoff)) + 
+  geom_hline(data=quantile_cutoffs[survey_label=="Mozambique 2018"], 
+             aes(yintercept=access_all_nets_cutoff)) +
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_distiller(palette="RdYlBu", name="RDT\nPrevalence") +
+  theme_minimal() +
+  labs(x="Wealth Index Score",
+       y="Access (All Nets)")
+ggsave("cluster_points_moz.svg", path=out_dir, width = 4.5, height=3)
+
+
+ggplot(itn_by_cluster[survey_label=="Uganda 2016"], 
+       aes(x=wealth_index_score, y=access_all_nets,
+           color=prev_rdt)) +
+  geom_point() +
+  geom_vline(data=quantile_cutoffs[survey_label=="Uganda 2016"],
+             aes(xintercept=wealth_cutoff)) + 
+  geom_hline(data=quantile_cutoffs[survey_label=="Uganda 2016"], 
+             aes(yintercept=access_all_nets_cutoff)) +
+  facet_wrap(~survey_label, scales="free") +
+  scale_color_distiller(palette="RdYlBu", name="RDT\nPrevalence") +
+  theme_minimal() +
+  labs(x="Wealth Index Score",
+       y="Access (All Nets)")
+ggsave("cluster_points_uga.svg", path=out_dir, width = 4.5, height=3)
+
 
 
 ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
@@ -470,6 +565,9 @@ ggplot(itn_by_cluster, aes(x=wealth_index_score, y=access_all_nets,
   theme_minimal() +
   labs(x="Wealth Index Score",
        y="Access (All Nets)")
+ggsave("cluster_points_all.svg", path=out_dir, width = 12, height=8)
+
+
 ######## FOR REVIEW ##################
 
 ggplot(itn_by_cluster, aes(x=access, y=prev_rdt,

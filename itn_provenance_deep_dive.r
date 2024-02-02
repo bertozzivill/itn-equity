@@ -18,7 +18,9 @@ options(digits=4)
 rm(list=ls())
 
 # filepaths
-parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/results/national"
+parent_dir <- "~/Dropbox (IDM)/Malaria Team Folder/projects/map_general/itn_equity/results/"
+in_dir <- file.path(parent_dir, "national")
+out_dir <- file.path(parent_dir, "gr_plots")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
 
@@ -26,18 +28,18 @@ ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
 
 # load data
-all_nets <- fread(file.path(parent_dir, "wealth_and_access_prov_surveys_all_nets.csv"))
+all_nets <- fread(file.path(in_dir, "wealth_and_access_prov_surveys_all_nets.csv"))
 all_nets[, type:="all nets"]
 
-free_only_nets <- fread(file.path(parent_dir, "wealth_and_access_prov_surveys_free_nets_only.csv"))
+free_only_nets <- fread(file.path(in_dir, "wealth_and_access_prov_surveys_free_nets_only.csv"))
 free_only_nets[, type:="free only"]
 
 compare_nets <- rbind(all_nets, free_only_nets)
 
-all_gaps <- fread(file.path(parent_dir, "access_gaps_prov_surveys_all_nets.csv"))
+all_gaps <- fread(file.path(in_dir, "access_gaps_prov_surveys_all_nets.csv"))
 all_gaps[, type:="all nets"]
 
-free_only_gaps <- fread(file.path(parent_dir, "access_gaps_prov_surveys_free_nets_only.csv"))
+free_only_gaps <- fread(file.path(in_dir, "access_gaps_prov_surveys_free_nets_only.csv"))
 free_only_gaps[, type:="free only"]
 
 compare_gaps <- rbind(all_gaps, free_only_gaps)
@@ -98,22 +100,26 @@ ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
   geom_hline(yintercept=80) + 
   geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.85, fill="#00BFC4") + 
   # geom_bar(aes(y=`free only`*100),  stat='identity', alpha=0.75, fill="#00BFC4") + 
-  geom_text(aes(label=round(`all nets`*100, 0), y=`all nets`*100-5)) +
+  geom_text(aes(label=round(`all nets`*100, 0), y=`all nets`*100-5), 
+            size=2.5) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=8)) +
   labs(x="",
        y="ITN Access")
+ggsave("access_surveylevel_allnets.svg", path=out_dir, width = 8, height=4.5)
 
 ggplot(compare_nets_survey_level_wide, aes(x=ordered_label_free_access),
 ) +
   geom_hline(yintercept=80) + 
   geom_bar(aes(y=`all nets`*100),  stat='identity', alpha=0.85, fill="#f8766d") + 
   geom_bar(aes(y=`free only`*100),  stat='identity', alpha=1, fill="#00BFC4") + 
-  geom_text(aes(label=round(percent_of_all, 0), y=`free only`*100-5)) +
+  geom_text(aes(label=round(percent_of_all, 0), y=`free only`*100-5),
+            size=2.5) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=8)) +
   labs(x="",
        y="ITN Access")
+ggsave("access_surveylevel_show_paid.svg", path=out_dir, width = 8, height=4.5)
 
 
 # now look on the quintile level
@@ -143,33 +149,36 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
            stat="identity",
            aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
-                y=access*100+10)) +
+                y=access*100+10), 
+            size=3) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access",
-       title="Access (all ITNs)")
+       y="Access")
+ggsave("access_quintile_all.svg", path=out_dir, width = 12, height=8)
 
 
-# grey out all but each quintile in turn
+ # grey out all but each quintile in turn
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
   geom_bar(data = compare_nets[type=="all nets" & highest_access_quintile=="Poorest"],
            stat="identity",
            aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
-                y=access*100+10)) +
+                y=access*100+10), 
+            size=3) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access",
-       title="Access (all ITNs)")
+       y="Access")
+ggsave("access_quintile_poorest.svg", path=out_dir, width = 12, height=8)
+
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -177,15 +186,17 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
            stat="identity",
            aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
-                y=access*100+10)) +
+                y=access*100+10), 
+            size=3) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access",
-       title="Access (all ITNs)")
+       y="Access")
+ggsave("access_quintile_poorer.svg", path=out_dir, width = 12, height=8)
+
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -193,15 +204,17 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
            stat="identity",
            aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
-                y=access*100+10)) +
+                y=access*100+10), 
+            size=3) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access",
-       title="Access (all ITNs)")
+       y="Access")
+ggsave("access_quintile_middle.svg", path=out_dir, width = 12, height=8)
+
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -209,15 +222,17 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
            stat="identity",
            aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
-                y=access*100+10)) +
+                y=access*100+10), 
+            size=3) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access",
-       title="Access (all ITNs)")
+       y="Access")
+ggsave("access_quintile_richer.svg", path=out_dir, width = 12, height=8)
+
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -225,15 +240,17 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
            stat="identity",
            aes(fill =wealth_quintile)) +
   geom_text(aes(label=round(access*100, 0),
-                y=access*100+10)) +
+                y=access*100+10), 
+            size=3) +
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   facet_wrap(~ordered_label_all_nets) + 
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access",
-       title="Access (all ITNs)")
+       y="Access")
+ggsave("access_quintile_richest.svg", path=out_dir, width = 12, height=8)
+
 
 
 compare_nets_wide <- dcast.data.table(compare_nets,
@@ -246,27 +263,48 @@ compare_nets_wide[, percent_of_all:=`free only` / `all nets` * 100]
 ggplot(compare_nets_wide, aes(x=wealth_quintile, y=percent_of_all, fill=percent_of_all)) + 
   geom_bar(stat="identity") + 
   geom_text(aes(label=round(percent_of_all, 0),
-                y=percent_of_all-15)) +
+                y=percent_of_all-15),
+            size=3) +
   scale_fill_distiller(palette = "RdYlBu", direction = 1, name="Percent") +
   theme_minimal() +
   facet_wrap(~ordered_label_all_nets) +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
         y="Percentage of Access Contributed by Free Nets" )
+ggsave("access_quintile_percents.svg", path=out_dir, width = 12, height=8)
 
 
 # replicate the access gap plots from last script
-ggplot(compare_nets, aes(x=access_rank_factor, fill=wealth_quintile)) +
+
+ggplot(compare_nets[type=="all nets"], aes(x=access_rank_factor, fill=wealth_quintile)) +
   geom_bar()+
   scale_fill_manual(values = rev(pnw_palette("Bay",5)),
                     name="Wealth Quintile") +
   geom_text(aes(label=after_stat(count)), 
             stat='count', 
             position=position_stack(vjust=0.5))+
-  facet_grid(.~type) +
   theme_minimal() +
+  theme(axis.text.x = element_text(size=12, angle=25)) +
   labs(x="",
        y="Count")
+ggsave("access_histogram_allnets.svg", path=out_dir, width = 6.5, height=6.5)
+
+compare_nets[type=="all nets", type_label:="All Nets"]
+compare_nets[type=="free only", type_label:="Free Only"]
+ ggplot(compare_nets, aes(x=access_rank_factor, fill=wealth_quintile)) +
+  geom_bar()+
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  geom_text(aes(label=after_stat(count)), 
+            stat='count', 
+            position=position_stack(vjust=0.5))+
+  facet_grid(.~type_label) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(size=12, angle=25)) +
+  labs(x="",
+       y="Count")
+ ggsave("access_histogram_compare.svg", path=out_dir, width = 12, height=6.5)
+ 
 
 ggplot(compare_nets, aes(x=wealth_quintile, y=access, fill=wealth_quintile)) +
   geom_point(alpha=0.5) +
