@@ -178,7 +178,7 @@ ggplot(itn_by_cluster, aes(x=wealth_index_score, y=prev_rdt)) +
 
 ggplot(itn_by_cluster, aes(x=wealth_index_score, y=prev_rdt)) +
   geom_point(aes(color=access_all_nets)) +
-  # geom_smooth(color="black") + 
+  geom_smooth(color="black") + 
   facet_wrap(~survey_label, scales="free") +
   scale_color_distiller(palette="YlGnBu", direction=1) + 
   theme_minimal()
@@ -199,7 +199,7 @@ ggplot(itn_by_cluster, aes(x=access, y=prev_rdt)) +
 
 ggplot(itn_by_cluster, aes(x=access_all_nets, y=prev_rdt)) +
   geom_point(aes(color=wealth_index_score)) +
-  # geom_smooth(color="black") + 
+  geom_smooth(color="black") + 
   facet_wrap(~survey_label, scales="free") +
   scale_color_distiller(palette="YlGn", direction=1) + 
   theme_minimal()
