@@ -33,7 +33,7 @@ africa_shp <- st_simplify(africa_shp, dTolerance=10000, preserveTopology =TRUE)
 
 
 ggplot() + 
-  geom_sf(data = africa_shp, name=="Gabon", color="black", size=0.3) +
+  geom_sf(data = africa_shp, color="black", size=0.3) +
   theme_classic(base_size = 12) +
   theme(axis.line = element_blank(), 
         axis.text = element_blank(),
@@ -45,6 +45,17 @@ ggplot() +
 
 ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
+# make sure shapefile names match with data names
+setdiff(ssa_grid$name, africa_shp$name)
+
+africa_shp <- 
+  mutate(africa_shp,
+         name = case_when(name == "Côte d'Ivoire"~"Cote d'Ivoire",
+                          name == "Democratic Republic of the Congo" ~ "Congo Democratic Republic",
+                          name == "Swaziland" ~ "Eswatini",
+                          name == "United Republic of Tanzania" ~ "Tanzania",
+                          TRUE~name))
+setdiff(ssa_grid$name, africa_shp$name)
 
 # load data
 all_nets <- fread(file.path(in_dir, "wealth_and_access_prov_surveys_all_nets.csv"))
@@ -204,7 +215,7 @@ ggplot() +
                           unique(compare_nets[type=="all nets" & 
                                                 highest_access_quintile=="Poorest"]$country_name)),
           color="black",
-          fill="#00BFC4",
+          fill="forestgreen",
           size=0.3) +
   theme_classic(base_size = 12) +
   theme(axis.line = element_blank(), 
@@ -233,6 +244,23 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
        y="Access")
 ggsave("access_quintile_poorer.svg", path=out_dir, width = 12, height=8)
 
+ggplot() + 
+  geom_sf(data = africa_shp, color="black", fill=NA, size=0.3) +
+  geom_sf(data = filter(africa_shp, name %in% 
+                          unique(compare_nets[type=="all nets" & 
+                                                highest_access_quintile=="Poorer"]$country_name)),
+          color="black",
+          fill="forestgreen",
+          size=0.3) +
+  theme_classic(base_size = 12) +
+  theme(axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0, 0, 0, 0), "in"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+ggsave("map_access_quintile_poorer.svg", path=out_dir, width = 3, height=3)
+
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -250,6 +278,23 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   labs(x="",
        y="Access")
 ggsave("access_quintile_middle.svg", path=out_dir, width = 12, height=8)
+
+ggplot() + 
+  geom_sf(data = africa_shp, color="black", fill=NA, size=0.3) +
+  geom_sf(data = filter(africa_shp, name %in% 
+                          unique(compare_nets[type=="all nets" & 
+                                                highest_access_quintile=="Middle"]$country_name)),
+          color="black",
+          fill="forestgreen",
+          size=0.3) +
+  theme_classic(base_size = 12) +
+  theme(axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0, 0, 0, 0), "in"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+ggsave("map_access_quintile_middle.svg", path=out_dir, width = 3, height=3)
 
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
@@ -269,6 +314,23 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
        y="Access")
 ggsave("access_quintile_richer.svg", path=out_dir, width = 12, height=8)
 
+ggplot() + 
+  geom_sf(data = africa_shp, color="black", fill=NA, size=0.3) +
+  geom_sf(data = filter(africa_shp, name %in% 
+                          unique(compare_nets[type=="all nets" & 
+                                                highest_access_quintile=="Richer"]$country_name)),
+          color="black",
+          fill="forestgreen",
+          size=0.3) +
+  theme_classic(base_size = 12) +
+  theme(axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0, 0, 0, 0), "in"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+ggsave("map_access_quintile_richer.svg", path=out_dir, width = 3, height=3)
+
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   geom_bar(stat="identity", alpha=0.85) + 
@@ -286,6 +348,23 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   labs(x="",
        y="Access")
 ggsave("access_quintile_richest.svg", path=out_dir, width = 12, height=8)
+
+ggplot() + 
+  geom_sf(data = africa_shp, color="black", fill=NA, size=0.3) +
+  geom_sf(data = filter(africa_shp, name %in% 
+                          unique(compare_nets[type=="all nets" & 
+                                                highest_access_quintile=="Richest"]$country_name)),
+          color="black",
+          fill="forestgreen",
+          size=0.3) +
+  theme_classic(base_size = 12) +
+  theme(axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0, 0, 0, 0), "in"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+ggsave("map_access_quintile_richest.svg", path=out_dir, width = 3, height=3)
 
 
 
