@@ -263,6 +263,9 @@ quantile_means <- itn_by_cluster[, lapply(.SD, weighted.mean, w=hh_sample_wt, na
                                          wealth_quantile,
                                          access_quantile)]
 
+# also find a normalized rdt prevalence by survey
+quantile_means[, standard_prev_rdt:= prev_rdt/max(prev_rdt, na.rm=T), by=dhs_survey_id]
+
 
 # find national rdt prevalence by survey
 national_prev <- itn_by_cluster[, list(nat_prev=weighted.mean(prev_rdt, hh_sample_wt,
@@ -306,7 +309,8 @@ ggplot(quantile_means[survey_label=="Benin 2017"],
   geom_tile() + 
   scale_fill_distiller(palette="RdYlBu", 
                        name= "RDT\nPrevalence",
-                       limits=c(0, 0.8)) + 
+                       #limits=c(0, 0.8)
+                       ) + 
   facet_wrap(~survey_label) + 
   theme_minimal() +
   labs(x= "Wealth Quintile",
@@ -319,7 +323,8 @@ ggplot(quantile_means[survey_label=="Mozambique 2018"],
   geom_tile() + 
   scale_fill_distiller(palette="RdYlBu", 
                        name= "RDT\nPrevalence",
-                       limits=c(0, 0.8)) + 
+                       # limits=c(0, 0.8)
+                       ) + 
   facet_wrap(~survey_label) + 
   theme_minimal() +
   labs(x= "Wealth Quintile",
@@ -332,7 +337,8 @@ ggplot(quantile_means[survey_label=="Uganda 2016"],
   geom_tile() + 
   scale_fill_distiller(palette="RdYlBu", 
                        name= "RDT\nPrevalence",
-                       limits=c(0, 0.8)) + 
+                       #limits=c(0, 0.8)
+                       ) + 
   facet_wrap(~survey_label) + 
   theme_minimal() +
   labs(x= "Wealth Quintile",
@@ -349,6 +355,19 @@ ggplot(quantile_means,
        y= "Access Quintile")
 ggsave("cluster_grid_all.svg", path=out_dir, width = 12, height=8)
 
+ggplot(quantile_means, 
+       aes(x=wealth_quantile, y=access_quantile, fill=standard_prev_rdt)) +
+  geom_tile() + 
+  geom_text(data=quantile_means[standard_prev_rdt==1],
+            aes(label=paste0(round(prev_rdt*100, 0), "%")),
+            size=3,
+            color="white") +
+  scale_fill_distiller(palette="RdYlBu", name= "Normalized\nTransmission\nIntensity") + 
+  facet_wrap(~prev_order) + 
+  theme_minimal() +
+  labs(x= "Wealth Quintile",
+       y= "Access Quintile")
+ggsave("cluster_grid_normalized_all.svg", path=out_dir, width = 12, height=8)
 
 ggplot(quantile_means, 
        aes(x=wealth_quantile, y=access_quantile, fill=prev_rdt)) +

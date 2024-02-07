@@ -12,6 +12,8 @@ library(survey)
 library(wesanderson)
 library(PNWColors)
 library(geofacet)
+library(tidyverse)
+library(sf)
 
 options(digits=4)
 
@@ -23,6 +25,23 @@ in_dir <- file.path(parent_dir, "national")
 out_dir <- file.path(parent_dir, "gr_plots")
 function_fname <- "~/repos/itn-equity/itn_equity_functions.r"
 source(function_fname)
+
+africa_shp_dir <- "/Users/bertozzivill/Google Drive/My Drive/itn_cube/input_data/general/shapefiles/Africa.shp"
+africa_shp <- read_sf(africa_shp_dir)
+#africa_dt <- data.table(fortify(africa_shp, region = "COUNTRY_ID"))
+africa_shp <- st_simplify(africa_shp, dTolerance=10000, preserveTopology =TRUE)
+
+
+ggplot() + 
+  geom_sf(data = africa_shp, name=="Gabon", color="black", size=0.3) +
+  theme_classic(base_size = 12) +
+  theme(axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0, 0, 0, 0), "in"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+
 
 ssa_grid <- fread("~/repos/itn-equity/geofacet_ssa_itn_equity.csv")
 
@@ -178,6 +197,23 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   labs(x="",
        y="Access")
 ggsave("access_quintile_poorest.svg", path=out_dir, width = 12, height=8)
+  
+ggplot() + 
+  geom_sf(data = africa_shp, color="black", fill=NA, size=0.3) +
+  geom_sf(data = filter(africa_shp, name %in% 
+                          unique(compare_nets[type=="all nets" & 
+                                                highest_access_quintile=="Poorest"]$country_name)),
+          color="black",
+          fill="#00BFC4",
+          size=0.3) +
+  theme_classic(base_size = 12) +
+  theme(axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(0, 0, 0, 0), "in"),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+ggsave("map_access_quintile_poorest.svg", path=out_dir, width = 3, height=3)
 
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
