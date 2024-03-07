@@ -174,10 +174,7 @@ compare_nets[, ordered_label_all_nets:= factor(seq_len(.N), labels=survey_label)
              by=list(type, wealth_quintile)]
 
 ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
-  geom_bar(stat="identity", alpha=0.85) + 
-  geom_bar(data = compare_nets[type=="all nets"],
-           stat="identity",
-           aes(fill =wealth_quintile)) +
+  geom_bar(stat="identity", aes(fill =wealth_quintile)) + 
   geom_text(aes(label=round(access*100, 0),
                 y=access*100+10), 
             size=3) +
@@ -187,8 +184,29 @@ ggplot(compare_nets[type=="all nets"], aes(x=wealth_quintile, y=access*100)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1)) +
   labs(x="",
-       y="Access")
+       y="Access",
+       title="Access by Wealth Quintile: All Nets")
 ggsave("access_quintile_all.svg", path=out_dir, width = 12, height=8)
+ggsave("access_quintile_all.png", path=out_dir, width = 12, height=8, bg="white")
+
+## for bruno-- same as above, but free nets only
+ggplot(compare_nets[type=="free only"], aes(x=wealth_quintile, y=access*100)) +
+  geom_bar(stat="identity", aes(fill =wealth_quintile)) + 
+  geom_text(aes(label=round(access*100, 0),
+                y=access*100+10), 
+            size=3) +
+  scale_fill_manual(values = rev(pnw_palette("Bay",5)),
+                    name="Wealth Quintile") +
+  facet_wrap(~ordered_label_all_nets) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  labs(x="",
+       y="Access",
+       title="Access by Wealth Quintile: Free Nets Only")
+ggsave("access_quintile_free_only.svg", path=out_dir, width = 12, height=8)
+ggsave("access_quintile_free_only.png", path=out_dir, width = 12, height=8, bg="white")
+
+
 
 
  # grey out all but each quintile in turn

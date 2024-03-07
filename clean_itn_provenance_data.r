@@ -149,6 +149,44 @@ new_free_prop <- prop.table(table(prov_subset$surveyid,
 # good agreement
 round(free_prop, 2)==round(new_free_prop, 2)
 
+############ test use counts
+# do the number of people using nets in the provenance data equal that in the 
+# household data?
+prov_subset[, n_slept_under_net_numeric:= ifelse(n_slept_under_net=="more than 5",
+                                                 5, as.integer(n_slept_under_net))]
+prov_hh_use <- prov_subset[, list(prov_n_itn= .N,
+                                  prov_n_slept_under_net=sum(n_slept_under_net_numeric)),
+                           by=list(surveyid, clusterid, hhid)]
+
+prov_hh_use <- merge(prov_hh_use, 
+                     hh_data[surveyid %in% unique(prov_hh_use$surveyid),
+                             list(surveyid, dhs_survey_id, country_name,clusterid, hhid, n_itn,
+                                  n_defacto_pop,
+                                  n_slept_under_itn)],
+                     by=c("surveyid", "clusterid", "hhid"),
+                     all=T)
+
+# provenance data is only na when there were zero nets to sleep under
+summary(prov_hh_use[is.na(prov_n_slept_under_net)])
+prov_hh_use <- prov_hh_use[!is.na(prov_n_slept_under_net)]
+
+# remove uganda rows that aren't in hh data-- these are  refugee numbers that we don't include
+prov_hh_use <- prov_hh_use[!is.na(n_itn)]
+
+#net counts are exactly right
+prov_hh_use[prov_n_itn!=n_itn]
+
+# when are the sleeping numbers different?
+prov_hh_use[, diff:= prov_n_slept_under_net-n_slept_under_itn]
+
+ggplot(prov_hh_use, aes(x=diff)) +geom_histogram()
+# different in 3.9% of cases
+nrow(prov_hh_use[diff!=0])/nrow(prov_hh_use)
+
+
+unique(prov_hh_use[diff!=0]$surveyid)
+
+# good to know for now, come back to this later
 
 ############ final cleaning and household-level aggregation
 # ok, finally, let's clean this, make plots, and bring up to the household level 
