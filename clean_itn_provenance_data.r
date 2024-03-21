@@ -154,39 +154,55 @@ round(free_prop, 2)==round(new_free_prop, 2)
 # household data?
 prov_subset[, n_slept_under_net_numeric:= ifelse(n_slept_under_net=="more than 5",
                                                  5, as.integer(n_slept_under_net))]
-prov_hh_use <- prov_subset[, list(prov_n_itn= .N,
-                                  prov_n_slept_under_net=sum(n_slept_under_net_numeric)),
+# make sure we understand the original data
+use_subset <- prov_subset[, list(surveyid, clusterid, hhid, netid, n_slept_under_net, n_slept_under_net_numeric)]
+
+
+prov_hh_use <- prov_subset[, list(net_table_n_itn= .N,
+                                  net_table_n_slept_under_itn=sum(n_slept_under_net_numeric)),
                            by=list(surveyid, clusterid, hhid)]
 
 prov_hh_use <- merge(prov_hh_use, 
                      hh_data[surveyid %in% unique(prov_hh_use$surveyid),
-                             list(surveyid, dhs_survey_id, country_name,clusterid, hhid, n_itn,
+                             list(surveyid, dhs_survey_id, country_name,clusterid, hhid, 
                                   n_defacto_pop,
-                                  n_slept_under_itn)],
+                                  hh_table_n_itn=n_itn,
+                                  hh_table_n_slept_under_itn=n_slept_under_itn)],
                      by=c("surveyid", "clusterid", "hhid"),
                      all=T)
 
 # provenance data is only na when there were zero nets to sleep under
-summary(prov_hh_use[is.na(prov_n_slept_under_net)])
-prov_hh_use <- prov_hh_use[!is.na(prov_n_slept_under_net)]
+summary(prov_hh_use[is.na(net_table_n_slept_under_itn)])
+prov_hh_use <- prov_hh_use[!is.na(net_table_n_slept_under_itn)]
 
 # remove uganda rows that aren't in hh data-- these are  refugee numbers that we don't include
-prov_hh_use <- prov_hh_use[!is.na(n_itn)]
+prov_hh_use <- prov_hh_use[!is.na(hh_table_n_itn)]
 
 #net counts are exactly right
-prov_hh_use[prov_n_itn!=n_itn]
+prov_hh_use[net_table_n_itn!=hh_table_n_itn]
+
+# sometimes net_table_n_slept_under_itn is greater than n_defacto_pop...
+# defer to n_defacto_pop, as per the logic of clean_itn_equity_data.r
+prov_hh_use[net_table_n_slept_under_itn>n_defacto_pop, net_table_n_slept_under_itn:=n_defacto_pop]
 
 # when are the sleeping numbers different?
-prov_hh_use[, diff:= prov_n_slept_under_net-n_slept_under_itn]
+prov_hh_use[, diff:= net_table_n_slept_under_itn-hh_table_n_slept_under_itn]
 
-ggplot(prov_hh_use, aes(x=diff)) +geom_histogram()
-# different in 3.9% of cases
+# it's almost always greater in the net file, not less
+ggplot(prov_hh_use[diff!=0], aes(x=diff)) + geom_histogram()
+
+# different in 2.3% of cases
 nrow(prov_hh_use[diff!=0])/nrow(prov_hh_use)
-
 
 unique(prov_hh_use[diff!=0]$surveyid)
 
-# good to know for now, come back to this later
+# it's only less than 1 in survey 515, in 13 households that log more than 5 people sleeping under a net
+
+# how many of these examples feature a surprisingly large use rate?
+test_discrepancy <- prov_hh_use[diff>0]
+test_discrepancy[, prov_use_rate:= net_table_n_slept_under_itn/net_table_n_itn]
+
+write.csv(prov_hh_use, file = "~/Desktop/net_vs_hh_table_use_discrepancy.csv", row.names = F)
 
 ############ final cleaning and household-level aggregation
 # ok, finally, let's clean this, make plots, and bring up to the household level 
